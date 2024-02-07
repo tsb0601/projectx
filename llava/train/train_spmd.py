@@ -1006,6 +1006,7 @@ def train(attn_implementation=None):
     num_devices = xr.global_runtime_device_count()
     
     print(f"number of devices:{num_devices}")
+    exit()
     model_axis = max(spmd_2d_sharding, 1)
     dcn_axis = spmd_dcn_parallelism
     data_axis = num_devices // model_axis // dcn_axis
