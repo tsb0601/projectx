@@ -40,6 +40,12 @@ class CLIPVisionTower(nn.Module):
 
     @torch.no_grad()
     def forward(self, images):
+        
+        # Very Important for TorchXLA
+        #self.vision_tower.vision_model.encoder.gradient_checkpointing = False
+        from torch_xla.utils.checkpoint import checkpoint
+        self.vision_tower.vision_model.encoder._gradient_checkpointing_func = checkpoint
+
         if type(images) is list:
             image_features = []
             for image in images:
@@ -47,8 +53,9 @@ class CLIPVisionTower(nn.Module):
                 image_feature = self.feature_select(image_forward_out).to(image.dtype)
                 image_features.append(image_feature)
         else:
-            image_forward_outs = self.vision_tower(images.to(device=self.device, dtype=self.dtype), output_hidden_states=True)
-            image_features = self.feature_select(image_forward_outs).to(images.dtype)
+            with torch.no_grad():
+                image_forward_outs = self.vision_tower(images.to(device=self.device, dtype=self.dtype), output_hidden_states=True)
+                image_features = self.feature_select(image_forward_outs).to(images.dtype)
 
         return image_features
 

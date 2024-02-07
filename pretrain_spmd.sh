@@ -1,6 +1,6 @@
 #!/bin/bash
 
-python llava/train/train_tpu.py \
+python llava/train/train_spmd.py \
     --deepspeed /home/tsb/projectx/scripts/zero2.json \
     --model_name_or_path /home/tsb/.cache/huggingface/hub/models--lmsys--vicuna-13b-v1.5/snapshots/3deb0106f72a3a433f0c6ea0cb978bdf14bcd3a6 \
     --version plain \
@@ -15,7 +15,7 @@ python llava/train/train_tpu.py \
     --bf16 True \
     --output_dir ./checkpoints/llava-v1.5-13b-pretrain \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 12 \
+    --per_device_train_batch_size 90 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \
