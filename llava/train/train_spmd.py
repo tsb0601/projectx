@@ -990,7 +990,7 @@ def train(attn_implementation=None):
     model = model.to(xm.xla_device(), dtype=torch.bfloat16)
 
 
-    spmd_2d_sharding = 2
+    spmd_2d_sharding = 8
     spmd_dcn_parallelism = 1
 
     # Place DCN on an independent axis in the mesh. Model parameters should be
