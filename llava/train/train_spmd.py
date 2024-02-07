@@ -42,6 +42,11 @@ import torch_xla.debug.profiler as xp
 import torch_xla.runtime as xr
 
 
+import wandb
+
+# Replace 'your_api_key' with your actual Weights & Biases API key
+wandb.login(key='2a145ed60d7ab35681e5a8ff31ea85624f239889')
+
 # Enable SPMD mode execution
 xr.use_spmd()
 
