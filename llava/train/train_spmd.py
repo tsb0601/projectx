@@ -1076,6 +1076,9 @@ def train(attn_implementation=None):
         safe_save_model_for_hf_trainer(trainer=trainer,
                                        output_dir=training_args.output_dir)
 
+def _mp_fn(index):
+    # For xla_spawn (TPUs)
+    train()
 
 if __name__ == "__main__":
     train()
