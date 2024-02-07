@@ -995,6 +995,8 @@ def train(attn_implementation=None):
     model = model.to(xm.xla_device(), dtype=torch.bfloat16)
 
 
+
+
     spmd_2d_sharding = 4
     spmd_dcn_parallelism = 1
 
@@ -1002,6 +1004,8 @@ def train(attn_implementation=None):
     # replicated along the DCN axis, and inputs and activations should have
     # the batch dimension sharded along the combined DCN and data axes.
     num_devices = xr.global_runtime_device_count()
+    
+    print(f"number of devices:{num_devices}")
     model_axis = max(spmd_2d_sharding, 1)
     dcn_axis = spmd_dcn_parallelism
     data_axis = num_devices // model_axis // dcn_axis
