@@ -1036,7 +1036,7 @@ def train(attn_implementation=None):
             xs.mark_sharding(param, spmd_mesh, ('data', 'model'))
         elif 'lm_head' in name:
             xs.mark_sharding(param, spmd_mesh, ('model', 'data'))
-        print(f'{name} {torch_xla._XLAC._get_xla_sharding_spec(param)}')
+        #print(f'{name} {torch_xla._XLAC._get_xla_sharding_spec(param)}')
 
     for i, block in enumerate(model.model.layers):
         # LLaMA-specific
