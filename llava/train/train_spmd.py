@@ -1020,7 +1020,9 @@ def train(attn_implementation=None):
     # Shard each parameter in the model based on the sharding strategy provided.
     for name, param in model.named_parameters():
         # Apply 2D sharding:
-        print('> [2D] Sharding tensor', name, param.shape)
+        
+        #print('> [2D] Sharding tensor', name, param.shape)
+        
         # We don't care about layernorm's weights, and
         # LLaMA doesn't use biases.
         if len(param.shape) == 1:
