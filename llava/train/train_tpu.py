@@ -1,6 +1,6 @@
-#from llava.train.train import train
+from llava.train.train import train
 
-from llava.train.train_spmd import train
+#from llava.train.train_spmd import train
 
 if __name__ == "__main__":
     #train()
