@@ -2,7 +2,7 @@
 
 python llava/train/train_tpu.py \
     --deepspeed /home/tsb/projectx/scripts/zero2.json \
-    --model_name_or_path /home/tsb/.cache/huggingface/hub/models--lmsys--vicuna-13b-v1.5/snapshots/3deb0106f72a3a433f0c6ea0cb978bdf14bcd3a6 \
+    --model_name_or_path /mnt/disks/storage/llm_ckpts/vicuna1.5 \
     --version plain \
     --data_path /mnt/disks/storage/data/pretrain_data/blip_laion_cc_sbu_558k.json \
     --image_folder /mnt/disks/storage/data/pretrain_data \
