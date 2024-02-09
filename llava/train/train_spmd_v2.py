@@ -1014,12 +1014,42 @@ def train(attn_implementation=None):
     dcn_mesh_shape = (dcn_axis, 1, 1)
     spmd_mesh = xs.HybridMesh(ici_mesh_shape=ici_mesh_shape,
                               dcn_mesh_shape=dcn_mesh_shape,
-                              axis_names=('dcn', 'fsdp', 'model'))
+                              axis_names=('dcn', 'data', 'model'))
+    
 
-    from torch_xla.experimental.spmd_fully_sharded_data_parallel import SpmdFullyShardedDataParallel as FSDPv2
-    def shard_output(output, mesh):
-        xs.mark_sharding(output.logits, mesh, ('fsdp', None, None))
-    model = FSDPv2(model, spmd_mesh, shard_output)
+    # Shard each parameter in the model based on the sharding strategy provided.
+    for name, param in model.named_parameters():
+        # Apply 2D sharding:
+        
+        #print('> [2D] Sharding tensor', name, param.shape)
+        
+        # We don't care about layernorm's weights, and
+        # LLaMA doesn't use biases.
+        if len(param.shape) == 1:
+            continue
+        if 'embed_tokens' in name:
+            xs.mark_sharding(param, spmd_mesh, ('model', 'data'))
+        elif 'q_proj' in name or 'k_proj' in name or 'v_proj' in name:
+            xs.mark_sharding(param, spmd_mesh, ('data', 'model'))
+        elif 'o_proj' in name:
+            xs.mark_sharding(param, spmd_mesh, ('model', 'data'))
+        elif 'gate_proj' in name or 'up_proj' in name:
+            xs.mark_sharding(param, spmd_mesh, ('model', 'data'))
+        elif 'down_proj' in name:
+            xs.mark_sharding(param, spmd_mesh, ('data', 'model'))
+        elif 'lm_head' in name:
+            xs.mark_sharding(param, spmd_mesh, ('model', 'data'))
+        #print(f'{name} {torch_xla._XLAC._get_xla_sharding_spec(param)}')
+
+    for i, block in enumerate(model.model.layers):
+        # LLaMA-specific
+        xs.apply_backward_optimization_barrier(model.model.layers[i])
+
+    print("Applying gradient checkpointing")
+    from torch_xla.distributed.fsdp import checkpoint_module
+    for i, block in enumerate(model.model.layers):
+        # LLaMA-specific
+        model.model.layers[i] = checkpoint_module(block)
 
  
 
