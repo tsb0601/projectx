@@ -997,7 +997,7 @@ def train(attn_implementation=None):
 
 
 
-    spmd_2d_sharding = 1
+    spmd_2d_sharding = 4
     spmd_dcn_parallelism = 1
 
     # Place DCN on an independent axis in the mesh. Model parameters should be
