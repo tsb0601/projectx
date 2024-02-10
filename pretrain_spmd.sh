@@ -15,7 +15,15 @@ python llava/train/train_spmd.py \
     --bf16 True \
     --output_dir ./checkpoints/llava-v1.5-13b-pretrain \
     --num_train_epochs 1 \
+<<<<<<< HEAD
     --per_device_train_batch_size 90 \
+=======
+<<<<<<< HEAD
+    --per_device_train_batch_size 90 \
+=======
+    --per_device_train_batch_size 256 \
+>>>>>>> 367dc5a6665b2a568fb144a856fac396e4280326
+>>>>>>> 8792dfb74613dcb89e6f6b9bf4b9eb5d4a29fbad
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \
