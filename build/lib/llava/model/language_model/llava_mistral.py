@@ -17,9 +17,10 @@ from typing import List, Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
-import torch_xla
+from torch.nn import CrossEntropyLoss
+
 from transformers import AutoConfig, AutoModelForCausalLM, \
-                         LlamaConfig, LlamaModel, LlamaForCausalLM
+                         MistralConfig, MistralModel, MistralForCausalLM
 
 from transformers.modeling_outputs import CausalLMOutputWithPast
 from transformers.generation.utils import GenerateOutput
@@ -27,39 +28,26 @@ from transformers.generation.utils import GenerateOutput
 from ..llava_arch import LlavaMetaModel, LlavaMetaForCausalLM
 
 
-class LlavaConfig(LlamaConfig):
-    model_type = "llava_llama"
-
-    debug = "debug"
+class LlavaMistralConfig(MistralConfig):
+    model_type = "llava_mistral"
 
 
-class LlavaLlamaModel(LlavaMetaModel, LlamaModel):
-    config_class = LlavaConfig
+class LlavaMistralModel(LlavaMetaModel, MistralModel):
+    config_class = LlavaMistralConfig
 
-    def __init__(self, config: LlamaConfig):
-        super(LlavaLlamaModel, self).__init__(config)
+    def __init__(self, config: MistralConfig):
+        super(LlavaMistralModel, self).__init__(config)
 
 
-class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
-    config_class = LlavaConfig
+class LlavaMistralForCausalLM(MistralForCausalLM, LlavaMetaForCausalLM):
+    config_class = LlavaMistralConfig
 
-    def __init__(self, config, spmd_debug=None, spmd_mesh=None, spmd_fsdp_sharding=None):
-        super(LlamaForCausalLM, self).__init__(config)
-        
-        config.spmd_debug = spmd_debug
-        config.spmd_mesh = spmd_mesh
-        config.spmd_fsdp_sharding = spmd_fsdp_sharding
-        self.model = LlavaLlamaModel(config)
-        self.pretraining_tp = config.pretraining_tp
-        self.vocab_size = config.vocab_size
+    def __init__(self, config):
+        super(MistralForCausalLM, self).__init__(config)
+        self.model = LlavaMistralModel(config)
+
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
-        self.spmd_mesh = spmd_mesh
-        self.spmd_debug = spmd_debug
-        self.spmd_fsdp_sharding = spmd_fsdp_sharding
-        
-        # TODO(jonbolin): Removing the SPMD mesh from the config since it is not serializable.
-        #del config.spmd_mesh
-        
+
         # Initialize weights and apply final processing
         self.post_init()
 
@@ -100,15 +88,6 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
                 image_sizes
             )
 
-        # Very Important for TorchXLA
-        #self.model.gradient_checkpointing = False
-            
-        #from torch_xla.utils.checkpoint import checkpoint
-
-        #self.model._gradient_checkpointing_func = checkpoint
-
-        #torch.utils.checkpoint.checkpoint = torch_xla.utils.checkpoint.checkpoint
-    
         return super().forward(
             input_ids=input_ids,
             attention_mask=attention_mask,
@@ -175,5 +154,5 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
             inputs['image_sizes'] = image_sizes
         return inputs
 
-AutoConfig.register("llava_llama", LlavaConfig)
-AutoModelForCausalLM.register(LlavaConfig, LlavaLlamaForCausalLM)
+AutoConfig.register("llava_mistral", LlavaMistralConfig)
+AutoModelForCausalLM.register(LlavaMistralConfig, LlavaMistralForCausalLM)

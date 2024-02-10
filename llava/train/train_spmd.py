@@ -25,6 +25,7 @@ from typing import Dict, Optional, Sequence, List
 import torch
 
 import transformers
+
 import tokenizers
 
 from llava.constants import IGNORE_INDEX, IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
@@ -832,6 +833,31 @@ def train(attn_implementation=None):
             )
         ))
 
+    
+     ### Implement SPMD
+
+    import torch_xla.core.xla_model as xm
+    import torch_xla.experimental.xla_sharding as xs
+    spmd_2d_sharding = 1
+    spmd_dcn_parallelism = 1
+
+    # Place DCN on an independent axis in the mesh. Model parameters should be
+    # replicated along the DCN axis, and inputs and activations should have
+    # the batch dimension sharded along the combined DCN and data axes.
+    num_devices = xr.global_runtime_device_count()
+    
+    print(f"number of devices:{num_devices}")
+
+    model_axis = max(spmd_2d_sharding, 1)
+    dcn_axis = spmd_dcn_parallelism
+    data_axis = num_devices // model_axis // dcn_axis
+    ici_mesh_shape = (1, data_axis, model_axis)
+    dcn_mesh_shape = (dcn_axis, 1, 1)
+    spmd_mesh = xs.HybridMesh(ici_mesh_shape=ici_mesh_shape,
+                              dcn_mesh_shape=dcn_mesh_shape,
+                              axis_names=('dcn', 'data', 'model'))
+    
+
     if model_args.vision_tower is not None:
         if 'mpt' in model_args.model_name_or_path:
             config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
@@ -845,8 +871,8 @@ def train(attn_implementation=None):
         else:
             model = LlavaLlamaForCausalLM.from_pretrained(
                 model_args.model_name_or_path,
+                spmd_mesh = spmd_mesh,
                 cache_dir=training_args.cache_dir,
-                attn_implementation=attn_implementation,
                 torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
                 **bnb_model_from_pretrained_args
             )
@@ -854,7 +880,6 @@ def train(attn_implementation=None):
         model = transformers.LlamaForCausalLM.from_pretrained(
             model_args.model_name_or_path,
             cache_dir=training_args.cache_dir,
-            attn_implementation=attn_implementation,
             torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
             **bnb_model_from_pretrained_args
         )
@@ -979,43 +1004,15 @@ def train(attn_implementation=None):
                                               data_args=data_args)
 
 
-    ### Implement SPMD
-
-    
-
-
-    import torch_xla.core.xla_model as xm
-    import torch_xla.experimental.xla_sharding as xs
-
+   
     # Replace the linear layer
     from torch_xla.distributed.fsdp.utils import apply_xla_patch_to_nn_linear
     model = apply_xla_patch_to_nn_linear(model, xs.xla_patched_nn_linear_forward)
 
 
+    torch.utils.checkpoint = torch_xla.utils.checkpoint
+
     model = model.to(xm.xla_device(), dtype=torch.bfloat16)
-
-
-
-
-    spmd_2d_sharding = 4
-    spmd_dcn_parallelism = 1
-
-    # Place DCN on an independent axis in the mesh. Model parameters should be
-    # replicated along the DCN axis, and inputs and activations should have
-    # the batch dimension sharded along the combined DCN and data axes.
-    num_devices = xr.global_runtime_device_count()
-    
-    print(f"number of devices:{num_devices}")
-
-    model_axis = max(spmd_2d_sharding, 1)
-    dcn_axis = spmd_dcn_parallelism
-    data_axis = num_devices // model_axis // dcn_axis
-    ici_mesh_shape = (1, data_axis, model_axis)
-    dcn_mesh_shape = (dcn_axis, 1, 1)
-    spmd_mesh = xs.HybridMesh(ici_mesh_shape=ici_mesh_shape,
-                              dcn_mesh_shape=dcn_mesh_shape,
-                              axis_names=('dcn', 'data', 'model'))
-    
 
     # Shard each parameter in the model based on the sharding strategy provided.
     for name, param in model.named_parameters():
@@ -1039,7 +1036,19 @@ def train(attn_implementation=None):
             xs.mark_sharding(param, spmd_mesh, ('data', 'model'))
         elif 'lm_head' in name:
             xs.mark_sharding(param, spmd_mesh, ('model', 'data'))
+        # The following are written for Vision encoder and Adapter in LLaVA
+        #elif 'vision_tower' in name:
+        #    xs.mark_sharding(param, spmd_mesh, ('model', 'data'))
+        elif 'mm_projector' in name:
+            xs.mark_sharding(param, spmd_mesh, ('data', 'model'))
+        else:
+            pass
         #print(f'{name} {torch_xla._XLAC._get_xla_sharding_spec(param)}')
+    
+    #print(model)
+
+    for i, block in enumerate(model.model.mm_projector):
+        xs.apply_backward_optimization_barrier(model.model.mm_projector[i])
 
     for i, block in enumerate(model.model.layers):
         # LLaMA-specific
@@ -1047,6 +1056,11 @@ def train(attn_implementation=None):
 
     print("Applying gradient checkpointing")
     from torch_xla.distributed.fsdp import checkpoint_module
+    for i, block in enumerate(model.model.vision_tower.vision_tower.vision_model.encoder.layers):
+        # CLIP-specific
+        model.model.vision_tower.vision_tower.vision_model.encoder.layers[i] = checkpoint_module(block)
+
+
     for i, block in enumerate(model.model.layers):
         # LLaMA-specific
         model.model.layers[i] = checkpoint_module(block)
@@ -1059,6 +1073,8 @@ def train(attn_implementation=None):
                     tokenizer=tokenizer,
                     args=training_args,
                     **data_module)
+
+    trainer.args.spmd_mesh = spmd_mesh
 
     if list(pathlib.Path(training_args.output_dir).glob("checkpoint-*")):
         trainer.train(resume_from_checkpoint=True)

@@ -2,7 +2,7 @@
 
 python llava/train/train_tpu.py \
     --deepspeed /home/tsb/projectx/scripts/zero2.json \
-    --model_name_or_path /home/tsb/.cache/huggingface/hub/models--lmsys--vicuna-13b-v1.5/snapshots/3deb0106f72a3a433f0c6ea0cb978bdf14bcd3a6 \
+    --model_name_or_path /mnt/disks/storage/llm_ckpts/vicuna1.5 \
     --version plain \
     --data_path /mnt/disks/storage/data/pretrain_data/blip_laion_cc_sbu_558k.json \
     --image_folder /mnt/disks/storage/data/pretrain_data \
@@ -15,7 +15,7 @@ python llava/train/train_tpu.py \
     --bf16 True \
     --output_dir ./checkpoints/llava-v1.5-13b-pretrain \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 12 \
+    --per_device_train_batch_size 6 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \

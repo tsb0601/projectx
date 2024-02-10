@@ -37,6 +37,20 @@ from llava.mm_utils import tokenizer_image_token
 
 from PIL import Image
 
+import torch_xla
+import torch_xla.debug.profiler as xp
+import torch_xla.runtime as xr
+
+
+import wandb
+
+# Replace 'your_api_key' with your actual Weights & Biases API key
+wandb.login(key='2a145ed60d7ab35681e5a8ff31ea85624f239889')
+
+# Enable SPMD mode execution
+xr.use_spmd()
+
+
 
 local_rank = None
 
@@ -785,7 +799,7 @@ def make_supervised_data_module(tokenizer: transformers.PreTrainedTokenizer,
                 data_collator=data_collator)
 
 
-def train(INDEX, attn_implementation=None):
+def train(attn_implementation=None):
 #def train(attn_implementation=None):
 
     global local_rank
@@ -965,30 +979,79 @@ def train(INDEX, attn_implementation=None):
                                               data_args=data_args)
 
 
-    ### Implement FSDP
+    ### Implement SPMD
+
+    
+
 
     import torch_xla.core.xla_model as xm
-    from pprint import pprint
-    from torch_xla.distributed.fsdp import XlaFullyShardedDataParallel as FSDP, checkpoint_module
-    fsdp_wrap = lambda m: FSDP(checkpoint_module(m), compute_dtype=torch.bfloat16, shard_param_on_dim_0=True, pin_layout_in_collective_ops=True)
-    import inspect
-    forward_signature = inspect.signature(model.forward.__func__)
-    model = model.to(torch.float32)
-    model = fsdp_wrap(model)
-    model.forward.__func__.__signature__ = forward_signature
+    import torch_xla.experimental.xla_sharding as xs
 
-    # Patch `xm.optimizer_step` not to reduce gradients in this case,
-    # as FSDP does not need gradient reduction over sharded parameters.
-    # Note: this ultimately should be something to be implemented in the Hugging Face trainer
-    # to directly call `optimizer.step()` when the model is an FSDP instance,
-    # but we chose to patch it here to get a standalone example without changing the Hugging Face trainer
-    def patched_optimizer_step(optimizer, barrier=False, optimizer_args={}):
-        loss = optimizer.step(**optimizer_args)
-        if barrier:
-            xm.mark_step()
-        return loss
+    # Replace the linear layer
+    from torch_xla.distributed.fsdp.utils import apply_xla_patch_to_nn_linear
+    model = apply_xla_patch_to_nn_linear(model, xs.xla_patched_nn_linear_forward)
 
-    xm.optimizer_step = patched_optimizer_step
+
+    model = model.to(xm.xla_device(), dtype=torch.bfloat16)
+
+
+
+
+    spmd_2d_sharding = 4
+    spmd_dcn_parallelism = 1
+
+    # Place DCN on an independent axis in the mesh. Model parameters should be
+    # replicated along the DCN axis, and inputs and activations should have
+    # the batch dimension sharded along the combined DCN and data axes.
+    num_devices = xr.global_runtime_device_count()
+    
+    print(f"number of devices:{num_devices}")
+
+    model_axis = max(spmd_2d_sharding, 1)
+    dcn_axis = spmd_dcn_parallelism
+    data_axis = num_devices // model_axis // dcn_axis
+    ici_mesh_shape = (1, data_axis, model_axis)
+    dcn_mesh_shape = (dcn_axis, 1, 1)
+    spmd_mesh = xs.HybridMesh(ici_mesh_shape=ici_mesh_shape,
+                              dcn_mesh_shape=dcn_mesh_shape,
+                              axis_names=('dcn', 'data', 'model'))
+    
+
+    # Shard each parameter in the model based on the sharding strategy provided.
+    for name, param in model.named_parameters():
+        # Apply 2D sharding:
+        
+        #print('> [2D] Sharding tensor', name, param.shape)
+        
+        # We don't care about layernorm's weights, and
+        # LLaMA doesn't use biases.
+        if len(param.shape) == 1:
+            continue
+        if 'embed_tokens' in name:
+            xs.mark_sharding(param, spmd_mesh, ('model', 'data'))
+        elif 'q_proj' in name or 'k_proj' in name or 'v_proj' in name:
+            xs.mark_sharding(param, spmd_mesh, ('data', 'model'))
+        elif 'o_proj' in name:
+            xs.mark_sharding(param, spmd_mesh, ('model', 'data'))
+        elif 'gate_proj' in name or 'up_proj' in name:
+            xs.mark_sharding(param, spmd_mesh, ('model', 'data'))
+        elif 'down_proj' in name:
+            xs.mark_sharding(param, spmd_mesh, ('data', 'model'))
+        elif 'lm_head' in name:
+            xs.mark_sharding(param, spmd_mesh, ('model', 'data'))
+        #print(f'{name} {torch_xla._XLAC._get_xla_sharding_spec(param)}')
+
+    for i, block in enumerate(model.model.layers):
+        # LLaMA-specific
+        xs.apply_backward_optimization_barrier(model.model.layers[i])
+
+    print("Applying gradient checkpointing")
+    from torch_xla.distributed.fsdp import checkpoint_module
+    for i, block in enumerate(model.model.layers):
+        # LLaMA-specific
+        model.model.layers[i] = checkpoint_module(block)
+
+ 
 
     
 
@@ -1020,6 +1083,9 @@ def train(INDEX, attn_implementation=None):
         safe_save_model_for_hf_trainer(trainer=trainer,
                                        output_dir=training_args.output_dir)
 
+def _mp_fn(index):
+    # For xla_spawn (TPUs)
+    train()
 
 if __name__ == "__main__":
     train()
