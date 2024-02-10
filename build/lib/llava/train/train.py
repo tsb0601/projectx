@@ -967,28 +967,31 @@ def train(INDEX, attn_implementation=None):
 
     ### Implement FSDP
 
-    import torch_xla.core.xla_model as xm
-    from pprint import pprint
-    from torch_xla.distributed.fsdp import XlaFullyShardedDataParallel as FSDP, checkpoint_module
-    fsdp_wrap = lambda m: FSDP(checkpoint_module(m), compute_dtype=torch.bfloat16, shard_param_on_dim_0=True, pin_layout_in_collective_ops=True)
-    import inspect
-    forward_signature = inspect.signature(model.forward.__func__)
-    model = model.to(torch.float32)
-    model = fsdp_wrap(model)
-    model.forward.__func__.__signature__ = forward_signature
+    # import torch_xla.core.xla_model as xm
+    # from pprint import pprint
+    # from torch_xla.distributed.fsdp import XlaFullyShardedDataParallel as FSDP, checkpoint_module
+    # fsdp_wrap = lambda m: FSDP(m, compute_dtype=torch.bfloat16, shard_param_on_dim_0=True, pin_layout_in_collective_ops=True)
+    # import inspect
+    # forward_signature = inspect.signature(model.forward.__func__)
+    # print(f"0: {model.dtype}")
+    # model = model.to(torch.float32)
+    # print(f"1: {model.dtype}")
+    # model = fsdp_wrap(model)
+    # print(f"2: {model.dtype}")
+    # model.forward.__func__.__signature__ = forward_signature
 
-    # Patch `xm.optimizer_step` not to reduce gradients in this case,
-    # as FSDP does not need gradient reduction over sharded parameters.
-    # Note: this ultimately should be something to be implemented in the Hugging Face trainer
-    # to directly call `optimizer.step()` when the model is an FSDP instance,
-    # but we chose to patch it here to get a standalone example without changing the Hugging Face trainer
-    def patched_optimizer_step(optimizer, barrier=False, optimizer_args={}):
-        loss = optimizer.step(**optimizer_args)
-        if barrier:
-            xm.mark_step()
-        return loss
+    # # Patch `xm.optimizer_step` not to reduce gradients in this case,
+    # # as FSDP does not need gradient reduction over sharded parameters.
+    # # Note: this ultimately should be something to be implemented in the Hugging Face trainer
+    # # to directly call `optimizer.step()` when the model is an FSDP instance,
+    # # but we chose to patch it here to get a standalone example without changing the Hugging Face trainer
+    # def patched_optimizer_step(optimizer, barrier=False, optimizer_args={}):
+    #     loss = optimizer.step(**optimizer_args)
+    #     if barrier:
+    #         xm.mark_step()
+    #     return loss
 
-    xm.optimizer_step = patched_optimizer_step
+    # xm.optimizer_step = patched_optimizer_step
 
     
 
