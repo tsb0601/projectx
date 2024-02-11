@@ -989,7 +989,7 @@ def train(INDEX, attn_implementation=None):
 
     # xm.optimizer_step = patched_optimizer_step
     import torch_xla
-    torch.utils.checkpoint.checkpoint = torch_xla.utils.checkpoint.checkpoint
+    torch.utils.checkpoint = torch_xla.utils.checkpoint
 
     trainer = LLaVATrainer(model=model,
                     tokenizer=tokenizer,
