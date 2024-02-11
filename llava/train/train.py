@@ -988,8 +988,8 @@ def train(INDEX, attn_implementation=None):
     #     return loss
 
     # xm.optimizer_step = patched_optimizer_step
-    import torch_xla
-    torch.utils.checkpoint = torch_xla.utils.checkpoint
+    #import torch_xla
+    #torch.utils.checkpoint = torch_xla.utils.checkpoint
 
     trainer = LLaVATrainer(model=model,
                     tokenizer=tokenizer,
