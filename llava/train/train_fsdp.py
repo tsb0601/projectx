@@ -1,5 +1,4 @@
 # Adopted from https://github.com/lm-sys/FastChat. Below is the original copyright:
-# Adopted from https://github.com/lm-sys/FastChat. Below is the original copyright:
 # Adopted from tatsu-lab@stanford_alpaca. Below is the original copyright:
 #    Copyright 2023 Rohan Taori, Ishaan Gulrajani, Tianyi Zhang, Yann Dubois, Xuechen Li
 #
@@ -786,6 +785,10 @@ def make_supervised_data_module(tokenizer: transformers.PreTrainedTokenizer,
                 data_collator=data_collator)
 
 
+
+
+
+
 def train(INDEX, attn_implementation=None):
 #def train(attn_implementation=None):
 
@@ -799,6 +802,8 @@ def train(INDEX, attn_implementation=None):
     local_rank = training_args.local_rank
     compute_dtype = (torch.float16 if training_args.fp16 else (torch.bfloat16 if training_args.bf16 else torch.float32))
     #compute_dtype = torch.float32
+
+
 
     bnb_model_from_pretrained_args = {}
     if training_args.bits in [4, 8]:
@@ -819,6 +824,10 @@ def train(INDEX, attn_implementation=None):
             )
         ))
 
+    
+    
+
+
     if model_args.vision_tower is not None:
         if 'mpt' in model_args.model_name_or_path:
             config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
@@ -833,8 +842,7 @@ def train(INDEX, attn_implementation=None):
             model = LlavaLlamaForCausalLM.from_pretrained(
                 model_args.model_name_or_path,
                 cache_dir=training_args.cache_dir,
-                attn_implementation=attn_implementation,
-                torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
+                #torch_dtype=model_args.torch_dtype,
                 **bnb_model_from_pretrained_args
             )
     else:
@@ -966,15 +974,15 @@ def train(INDEX, attn_implementation=None):
                                               data_args=data_args)
 
 
-    ## Implement FSDP
+    ### Implement FSDP
 
     import torch_xla.core.xla_model as xm
     from pprint import pprint
     from torch_xla.distributed.fsdp import XlaFullyShardedDataParallel as FSDP, checkpoint_module
-    fsdp_wrap = lambda m: FSDP(m, compute_dtype=torch.bfloat16, shard_param_on_dim_0=True, pin_layout_in_collective_ops=True)
+    fsdp_wrap = lambda m: FSDP(checkpoint_module(m), compute_dtype=torch.bfloat16, shard_param_on_dim_0=True, pin_layout_in_collective_ops=True)
     import inspect
     forward_signature = inspect.signature(model.forward.__func__)
-    model = model.to(torch.float32)
+    #model = model.to(torch.float32)
     model = fsdp_wrap(model)
     model.forward.__func__.__signature__ = forward_signature
 
@@ -992,7 +1000,7 @@ def train(INDEX, attn_implementation=None):
     xm.optimizer_step = patched_optimizer_step
 
     
-
+    trainer.args.spmd_mesh = None
     trainer = LLaVATrainer(model=model,
                     tokenizer=tokenizer,
                     args=training_args,
