@@ -5,6 +5,7 @@ from safetensors.torch import storage_size, storage_ptr
 # Using Patch to fix the bug
 #safetensors.torch.storage_ptr = lambda tensor: 0
 import wandb
+wandb.login(key='2a145ed60d7ab35681e5a8ff31ea85624f239889')
 wandb.init(project='llava_tpu', entity='benchmark_vllm')
 
 
