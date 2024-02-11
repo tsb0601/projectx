@@ -1,7 +1,6 @@
 #!/bin/bash
 
 python llava/train/train_tpu.py \
-    --deepspeed /home/tsb/projectx/scripts/zero2.json \
     --model_name_or_path /mnt/disks/storage/llm_ckpts/vicuna1.5 \
     --version plain \
     --data_path /mnt/disks/storage/data/pretrain_data/blip_laion_cc_sbu_558k.json \

@@ -58,7 +58,7 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
         self.spmd_fsdp_sharding = spmd_fsdp_sharding
         
         # TODO(jonbolin): Removing the SPMD mesh from the config since it is not serializable.
-        #del config.spmd_mesh
+        del config.spmd_mesh
         
         # Initialize weights and apply final processing
         self.post_init()
