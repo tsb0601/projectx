@@ -4,19 +4,6 @@ from safetensors.torch import storage_size, storage_ptr
 
 # Using Patch to fix the bug
 #safetensors.torch.storage_ptr = lambda tensor: 0
-import torch_xla.core.xla_model as xm
-
-is_master = xm.get_ordinal() == 0
-
-import wandb
-
-# Initialize WandB only in the master process
-wandb.login(key='ed3fdff5ab6fba82056002ff9eafa951bf24ec14')
-
-if is_master:
-    wandb.init(project='llava_tpu', entity='benchmark_vllm')
-else:
-    wandb.init(mode="disabled")
 
 
 def id_tensor_storage(tensor):
@@ -49,7 +36,21 @@ if __name__ == "__main__":
     #train()
     import multiprocessing as mp
     import torch_xla.core.xla_model as xm
+
+    is_master = xm.get_ordinal() == 0
     import torch_xla.distributed.xla_multiprocessing as xmp
+
+        
+    import wandb
+
+    # Initialize WandB only in the master process
+    wandb.login(key='ed3fdff5ab6fba82056002ff9eafa951bf24ec14')
+
+    if is_master:
+        wandb.init(project='llava_tpu', entity='benchmark_vllm')
+    else:
+        wandb.init(mode="disabled")
+
 
     
    
