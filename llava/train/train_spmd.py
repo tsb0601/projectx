@@ -800,6 +800,21 @@ def train(attn_implementation=None):
 #def train(attn_implementation=None):
 
     global local_rank
+
+    
+    import torch_xla.core.xla_model as xm
+    is_master = xm.get_ordinal() == 0
+    import wandb
+
+    # Initialize WandB only in the master process
+    wandb.login(key='ed3fdff5ab6fba82056002ff9eafa951bf24ec14')
+
+    if is_master:
+        wandb.init(project='llava_tpu', entity='benchmark_vllm')
+    else:
+        wandb.init(mode="disabled")
+
+        
     
 
     parser = transformers.HfArgumentParser(
