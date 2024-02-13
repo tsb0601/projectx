@@ -43,6 +43,9 @@ import torch_xla.debug.profiler as xp
 import torch_xla.runtime as xr
 
 
+import wandb
+wandb.login(key='ed3fdff5ab6fba82056002ff9eafa951bf24ec14')
+wandb.init(project='llava_tpu', entity='benchmark_vllm')
 
 # Enable SPMD mode execution
 xr.use_spmd()
@@ -800,27 +803,13 @@ def train(attn_implementation=None):
 #def train(attn_implementation=None):
 
     global local_rank
-
-    
-    import torch_xla.core.xla_model as xm
-    is_master = xm.get_ordinal() == 0
-    import wandb
-
-    # Initialize WandB only in the master process
-    wandb.login(key='ed3fdff5ab6fba82056002ff9eafa951bf24ec14')
-
-    if is_master:
-        wandb.init(project='llava_tpu', entity='benchmark_vllm')
-    else:
-        wandb.init(mode="disabled")
-
-        
     
 
     parser = transformers.HfArgumentParser(
         (ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-    #print(model_args, data_args, training_args)
+    print(model_args, data_args, training_args)
+    #exit()
     local_rank = training_args.local_rank
     compute_dtype = (torch.float16 if training_args.fp16 else (torch.bfloat16 if training_args.bf16 else torch.float32))
     #compute_dtype = torch.float32
@@ -849,7 +838,7 @@ def train(attn_implementation=None):
 
     import torch_xla.core.xla_model as xm
     import torch_xla.experimental.xla_sharding as xs
-    spmd_2d_sharding = 4
+    spmd_2d_sharding = 1
     spmd_dcn_parallelism = 1
 
     # Place DCN on an independent axis in the mesh. Model parameters should be
@@ -1048,8 +1037,11 @@ def train(attn_implementation=None):
         elif 'lm_head' in name:
             xs.mark_sharding(param, spmd_mesh, ('model', 'data'))
         # The following are written for Vision encoder and Adapter in LLaVA
-        #elif 'vision_tower' in name:
-        #    xs.mark_sharding(param, spmd_mesh, ('model', 'data'))
+        elif 'vision_tower' in name:
+            try:
+                xs.mark_sharding(param, spmd_mesh, ('model', 'data'))
+            except:
+                print(name, param.shape)
         elif 'mm_projector' in name:
             xs.mark_sharding(param, spmd_mesh, ('data', 'model'))
         else:
@@ -1115,6 +1107,13 @@ def _mp_fn(index):
     train()
 
 if __name__ == "__main__":
+    import torch_xla.debug.metrics as met
+
+    # # For short report that only contains a few key metrics.
+    # print(met.short_metrics_report())
+    # # For full report that includes all metrics.
+    # print(met.metrics_report())
+
     train()
 
     
