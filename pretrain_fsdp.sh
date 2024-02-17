@@ -1,7 +1,6 @@
 #!/bin/bash
 
-python llava/train/train_spmd.py \
-    --deepspeed /home/tsb/projectx/scripts/zero2.json \
+python llava/train/train_tpu.py \
     --model_name_or_path /mnt/disks/storage/llm_ckpts/vicuna1.5 \
     --version plain \
     --data_path /mnt/disks/storage/data/pretrain_data/blip_laion_cc_sbu_558k.json \
@@ -12,9 +11,9 @@ python llava/train/train_spmd.py \
     --mm_use_im_start_end False \
     --mm_use_im_patch_token False \
     --bf16 True \
-    --output_dir ./checkpoints/llava-v1.5-13b-pretrain \
+    --output_dir ./checkpoints/llava-v1.5-13b \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 12 \
+    --per_device_train_batch_size 7 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \
@@ -31,4 +30,6 @@ python llava/train/train_spmd.py \
     --gradient_checkpointing True \
     --dataloader_num_workers 4 \
     --lazy_preprocess True \
-    --report_to wandb
+    --report_to wandb \
+    --fsdp "full_shard" \
+    --fsdp_config fsdp_config.json

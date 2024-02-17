@@ -23,6 +23,7 @@ import pathlib
 from typing import Dict, Optional, Sequence, List
 
 import torch
+from torch import nn
 
 import transformers
 import tokenizers
@@ -786,6 +787,23 @@ def make_supervised_data_module(tokenizer: transformers.PreTrainedTokenizer,
 
 
 
+def convert_to_bf16_except_llama(model):
+    # Loop through all modules and their respective parameters
+    
+    # Assuming model is your PyTorch model
+    for name, param in model.named_parameters():
+        # Check if 'model.layers' is not in the parameter name
+        if 'model.layers' not in name:
+            # Convert parameter to bfloat16
+            param.data = param.data.to(torch.bfloat16)
+            # if param.requires_grad:
+            #     # Also convert the grad attribute if it exists
+            #     param.grad = param.grad.to(torch.bfloat16) if param.grad is not None else None
+            print(f"{name} this is converted")
+
+        else:
+            print(f"{name} this is not converted")
+
 
 
 
@@ -802,6 +820,21 @@ def train(INDEX, attn_implementation=None):
     local_rank = training_args.local_rank
     compute_dtype = (torch.float16 if training_args.fp16 else (torch.bfloat16 if training_args.bf16 else torch.float32))
     #compute_dtype = torch.float32
+
+    # Forward
+    def forward(self, hidden_states):
+        input_dtype = hidden_states.dtype
+        #print("input dtype is:", input_dtype)
+        hidden_states = hidden_states.to(torch.float32)
+        variance = hidden_states.pow(2).mean(-1, keepdim=True)
+        hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
+        output = (self.weight * hidden_states).to(input_dtype)
+        #print("output dtype is", output.dtype)
+        return output
+
+    transformers.models.llama.modeling_llama.LlamaRMSNorm.forward = forward
+
+    print("I changed forward!")
 
 
 
@@ -842,7 +875,7 @@ def train(INDEX, attn_implementation=None):
             model = LlavaLlamaForCausalLM.from_pretrained(
                 model_args.model_name_or_path,
                 cache_dir=training_args.cache_dir,
-                #torch_dtype=model_args.torch_dtype,
+                torch_dtype=None,
                 **bnb_model_from_pretrained_args
             )
     else:
@@ -928,7 +961,8 @@ def train(INDEX, attn_implementation=None):
         )
         
         vision_tower = model.get_vision_tower()
-        vision_tower.to(dtype=torch.bfloat16 if training_args.bf16 else torch.float16, device=training_args.device)
+        #vision_tower.to(dtype=torch.bfloat16 if training_args.bf16 else torch.float16, device=training_args.device)
+        vision_tower.to(dtype=torch.bfloat16, device=training_args.device)
 
         data_args.image_processor = vision_tower.image_processor
         data_args.is_multimodal = True
@@ -976,33 +1010,33 @@ def train(INDEX, attn_implementation=None):
 
     ### Implement FSDP
 
-    torch.utils.checkpoint = torch_xla.utils.checkpoint
+
+    # import torch_xla.core.xla_model as xm
+    # from pprint import pprint
+    # from torch_xla.distributed.fsdp import XlaFullyShardedDataParallel as FSDP, checkpoint_module
+    # fsdp_wrap = lambda m: FSDP(m, compute_dtype=torch.bfloat16, shard_param_on_dim_0=True, pin_layout_in_collective_ops=True)
+    # import inspect
+    # forward_signature = inspect.signature(model.forward.__func__)
+    # model = model.to(torch.float32)
+    # model = fsdp_wrap(model)
+    # model.forward.__func__.__signature__ = forward_signature
+
+    # # Patch `xm.optimizer_step` not to reduce gradients in this case,
+    # # as FSDP does not need gradient reduction over sharded parameters.
+    # # Note: this ultimately should be something to be implemented in the Hugging Face trainer
+    # # to directly call `optimizer.step()` when the model is an FSDP instance,
+    # # but we chose to patch it here to get a standalone example without changing the Hugging Face trainer
+    # def patched_optimizer_step(optimizer, barrier=False, optimizer_args={}):
+    #     loss = optimizer.step(**optimizer_args)
+    #     if barrier:
+    #         xm.mark_step()
+    #     return loss
+
+    # xm.optimizer_step = patched_optimizer_step
 
 
-    import torch_xla.core.xla_model as xm
-    from pprint import pprint
-    from torch_xla.distributed.fsdp import XlaFullyShardedDataParallel as FSDP, checkpoint_module
-    fsdp_wrap = lambda m: FSDP(m, compute_dtype=torch.bfloat16, shard_param_on_dim_0=True, pin_layout_in_collective_ops=True)
-    import inspect
-    forward_signature = inspect.signature(model.forward.__func__)
-    model = model.to(torch.float32)
-    model = fsdp_wrap(model)
-    model.forward.__func__.__signature__ = forward_signature
+    #convert_to_bf16_except_llama(model)
 
-    # Patch `xm.optimizer_step` not to reduce gradients in this case,
-    # as FSDP does not need gradient reduction over sharded parameters.
-    # Note: this ultimately should be something to be implemented in the Hugging Face trainer
-    # to directly call `optimizer.step()` when the model is an FSDP instance,
-    # but we chose to patch it here to get a standalone example without changing the Hugging Face trainer
-    def patched_optimizer_step(optimizer, barrier=False, optimizer_args={}):
-        loss = optimizer.step(**optimizer_args)
-        if barrier:
-            xm.mark_step()
-        return loss
-
-    xm.optimizer_step = patched_optimizer_step
-
-    
     trainer = LLaVATrainer(model=model,
                     tokenizer=tokenizer,
                     args=training_args,
