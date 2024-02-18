@@ -955,6 +955,7 @@ def train(INDEX, attn_implementation=None):
             conversation_lib.default_conversation = conversation_lib.conv_templates["vicuna_v1"]
 
     if model_args.vision_tower is not None:
+        print(111111111)
         model.get_model().initialize_vision_modules(
             model_args=model_args,
             fsdp=training_args.fsdp
@@ -964,6 +965,7 @@ def train(INDEX, attn_implementation=None):
         #vision_tower.to(dtype=torch.bfloat16 if training_args.bf16 else torch.float16, device=training_args.device)
         vision_tower.to(dtype=torch.bfloat16, device=training_args.device)
 
+        print(2222222222)
         data_args.image_processor = vision_tower.image_processor
         data_args.is_multimodal = True
 
@@ -985,6 +987,8 @@ def train(INDEX, attn_implementation=None):
         if training_args.bits in [4, 8]:
             model.get_model().mm_projector.to(dtype=compute_dtype, device=training_args.device)
 
+        
+        print(44444444444)
         model.config.mm_use_im_start_end = data_args.mm_use_im_start_end = model_args.mm_use_im_start_end
         model.config.mm_projector_lr = training_args.mm_projector_lr
         training_args.use_im_start_end = model_args.mm_use_im_start_end
