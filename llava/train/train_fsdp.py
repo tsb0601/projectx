@@ -1004,6 +1004,7 @@ def train(INDEX, attn_implementation=None):
                     if training_args.bf16 and module.weight.dtype == torch.float32:
                         module = module.to(torch.bfloat16)
 
+    print("Preparing data module...")
     data_module = make_supervised_data_module(tokenizer=tokenizer,
                                               data_args=data_args)
 
