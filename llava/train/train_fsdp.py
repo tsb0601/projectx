@@ -872,12 +872,15 @@ def train(INDEX, attn_implementation=None):
                 **bnb_model_from_pretrained_args
             )
         else:
+            
+            print("!!!!!!!!!!!!!!!!!!!!!!")
             model = LlavaLlamaForCausalLM.from_pretrained(
                 model_args.model_name_or_path,
                 cache_dir=training_args.cache_dir,
                 torch_dtype=None,
                 **bnb_model_from_pretrained_args
             )
+            print("????????????????????")
     else:
         model = transformers.LlamaForCausalLM.from_pretrained(
             model_args.model_name_or_path,
