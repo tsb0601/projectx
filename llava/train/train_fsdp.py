@@ -878,6 +878,7 @@ def train(INDEX, attn_implementation=None):
                 model_args.model_name_or_path,
                 cache_dir=training_args.cache_dir,
                 torch_dtype=None,
+                do_sample=True,
                 **bnb_model_from_pretrained_args
             )
             print("????????????????????")
