@@ -1037,10 +1037,14 @@ def train(INDEX, attn_implementation=None):
 
     #convert_to_bf16_except_llama(model)
 
+    print("Setting up trainer...")
+
     trainer = LLaVATrainer(model=model,
                     tokenizer=tokenizer,
                     args=training_args,
                     **data_module)
+    
+    print("Starting training...")
 
     if list(pathlib.Path(training_args.output_dir).glob("checkpoint-*")):
         trainer.train(resume_from_checkpoint=True)
