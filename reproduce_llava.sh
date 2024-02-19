@@ -13,12 +13,12 @@ python llava/train/train_tpu.py \
     --bf16 True \
     --output_dir ./checkpoints/llava-v1.5-13b \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 60 \
+    --per_device_train_batch_size 50 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \
     --save_strategy "steps" \
-    --save_steps 24000 \
+    --save_steps 10 \
     --save_total_limit 1 \
     --learning_rate 2e-5 \
     --weight_decay 0. \
