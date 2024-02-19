@@ -13,7 +13,7 @@ python llava/train/train_tpu.py \
     --bf16 True \
     --output_dir ./checkpoints/llava-v1.5-13b \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 20 \
+    --per_device_train_batch_size 15 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \
@@ -28,7 +28,7 @@ python llava/train/train_tpu.py \
     --tf32 False \
     --model_max_length 2048 \
     --gradient_checkpointing True \
-    --dataloader_num_workers 4 \
+    --dataloader_num_workers 8 \
     --lazy_preprocess True \
     --report_to wandb \
     --fsdp "full_shard" \
