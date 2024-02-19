@@ -16,7 +16,6 @@ python llava/train/train_tpu.py \
     --per_device_train_batch_size 20 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
-    --group_by_modality_length True \
     --evaluation_strategy "no" \
     --save_strategy "steps" \
     --save_steps 10 \
