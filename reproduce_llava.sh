@@ -1,5 +1,4 @@
 #!/bin/bash
-
 python llava/train/train_tpu.py \
     --model_name_or_path /mnt/disks/storage/llm_ckpts/vicuna1.5 \
     --version v1 \
