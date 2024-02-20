@@ -834,7 +834,6 @@ def train(INDEX, attn_implementation=None):
 
     transformers.models.llama.modeling_llama.LlamaRMSNorm.forward = forward
 
-    print("I changed forward!")
 
 
 
@@ -860,7 +859,6 @@ def train(INDEX, attn_implementation=None):
     
     
 
-    print("before loading model")
     if model_args.vision_tower is not None:
         if 'mpt' in model_args.model_name_or_path:
             config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
@@ -873,7 +871,6 @@ def train(INDEX, attn_implementation=None):
             )
         else:
             
-            print("!!!!!!!!!!!!!!!!!!!!!!")
             model = LlavaLlamaForCausalLM.from_pretrained(
                 model_args.model_name_or_path,
                 cache_dir=training_args.cache_dir,
@@ -881,7 +878,6 @@ def train(INDEX, attn_implementation=None):
                 do_sample=True,
                 **bnb_model_from_pretrained_args
             )
-            print("????????????????????")
     else:
         model = transformers.LlamaForCausalLM.from_pretrained(
             model_args.model_name_or_path,
@@ -890,7 +886,6 @@ def train(INDEX, attn_implementation=None):
             torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
             **bnb_model_from_pretrained_args
         )
-    print("after loading model")
 
     model.config.use_cache = False
 
@@ -961,7 +956,6 @@ def train(INDEX, attn_implementation=None):
             conversation_lib.default_conversation = conversation_lib.conv_templates["vicuna_v1"]
 
     if model_args.vision_tower is not None:
-        print(111111111)
         model.get_model().initialize_vision_modules(
             model_args=model_args,
             fsdp=training_args.fsdp
@@ -971,7 +965,6 @@ def train(INDEX, attn_implementation=None):
         #vision_tower.to(dtype=torch.bfloat16 if training_args.bf16 else torch.float16, device=training_args.device)
         vision_tower.to(dtype=torch.bfloat16, device=training_args.device)
 
-        print(2222222222)
         data_args.image_processor = vision_tower.image_processor
         data_args.is_multimodal = True
 
@@ -994,7 +987,6 @@ def train(INDEX, attn_implementation=None):
             model.get_model().mm_projector.to(dtype=compute_dtype, device=training_args.device)
 
         
-        print(44444444444)
         model.config.mm_use_im_start_end = data_args.mm_use_im_start_end = model_args.mm_use_im_start_end
         model.config.mm_projector_lr = training_args.mm_projector_lr
         training_args.use_im_start_end = model_args.mm_use_im_start_end
@@ -1014,7 +1006,6 @@ def train(INDEX, attn_implementation=None):
                     if training_args.bf16 and module.weight.dtype == torch.float32:
                         module = module.to(torch.bfloat16)
 
-    print("Preparing data module...")
     data_module = make_supervised_data_module(tokenizer=tokenizer,
                                               data_args=data_args)
 
@@ -1048,14 +1039,12 @@ def train(INDEX, attn_implementation=None):
 
     #convert_to_bf16_except_llama(model)
 
-    print("Setting up trainer...")
 
     trainer = LLaVATrainer(model=model,
                     tokenizer=tokenizer,
                     args=training_args,
                     **data_module)
     
-    print("Starting training...")
 
     if list(pathlib.Path(training_args.output_dir).glob("checkpoint-*")):
         trainer.train(resume_from_checkpoint=True)
