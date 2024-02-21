@@ -1,6 +1,4 @@
-import safetensors
 import torch_xla
-from safetensors.torch import storage_size, storage_ptr
 
 # Using Patch to fix the bug
 #safetensors.torch.storage_ptr = lambda tensor: 0
