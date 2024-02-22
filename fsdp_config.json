@@ -1,11 +1,10 @@
 {
     "fsdp_transformer_layer_cls_to_wrap": [
         "LlamaDecoderLayer"
-
     ],
     "xla": true,
     "xla_fsdp_settings": {
-        "reshard_after_forward": true,
+        "reshard_after_forward": false,
         "compute_dtype": "bfloat16",
         "mark_step_on_finalization":true,
         "shard_param_on_dim_0": true,
