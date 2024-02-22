@@ -4,7 +4,7 @@
     ],
     "xla": true,
     "xla_fsdp_settings": {
-        "reshard_after_forward": false,
+        "reshard_after_forward": true,
         "compute_dtype": "bfloat16",
         "mark_step_on_finalization":true,
         "shard_param_on_dim_0": true,
