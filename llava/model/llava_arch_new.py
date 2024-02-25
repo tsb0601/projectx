@@ -126,7 +126,7 @@ def unpad_image(tensor, original_size):
         unpadded_tensor = tensor[:, :, padding:current_width - padding]
 
     return unpadded_tensor
-
+import time
 
 class LlavaMetaForCausalLM(ABC):
 
@@ -146,10 +146,7 @@ class LlavaMetaForCausalLM(ABC):
         self, input_ids, position_ids, attention_mask, past_key_values, labels,
         images, image_sizes=None
     ):
-        print("before:", input_ids, position_ids, attention_mask, past_key_values, labels, type(images))
-        print("before:", attention_mask.shape, input_ids.shape, labels.shape)
-
-        print("-----------------------------------------")
+       
         
         vision_tower = self.get_vision_tower()
         if vision_tower is None or images is None or input_ids.shape[1] == 1:
@@ -157,37 +154,64 @@ class LlavaMetaForCausalLM(ABC):
 
         if type(images) is list:
             # Flatten the list of lists into a single list
-            flattened_images = [item for sublist in images for item in sublist]
+            if not images:  # This checks if images is an empty list
+                # Handle the empty list case as needed
+                # For example, set image_features to None or an empty tensor
+                image_features = None  # or torch.tensor([]), depending on your encode_images method's requirements
+            else:
+                flattened_images = [item for sublist in images for item in sublist]
 
-            # Process the flattened list of tensors
-            if type(flattened_images) is list:
-                flattened_images = [x.unsqueeze(0) if x.ndim == 3 else x for x in flattened_images]
-            concat_images = torch.cat([image for image in flattened_images], dim=0)
-            image_features = self.encode_images(concat_images)           
+                # Process the flattened list of tensors
+                if type(flattened_images) is list:
+                    flattened_images = [x.unsqueeze(0) if x.ndim == 3 else x for x in flattened_images]
+                concat_images = torch.cat([image for image in flattened_images], dim=0)
+                image_features = self.encode_images(concat_images)           
         else:
             image_features = self.encode_images(images)
+            
 
         
         ##################################
         ## Changes Made for Multi Image ##
         ##################################
             
-        _, image_feature_size, embedding_size = image_features.shape
-    
-        # Create a mask for IMAGE_TOKEN_INDEX positions
-        image_token_mask = (input_ids == IMAGE_TOKEN_INDEX)
+         # remove the padding using attention_mask -- FIXME
+        _labels = labels
+        _position_ids = position_ids
+        _attention_mask = attention_mask
+        if attention_mask is None:
+            attention_mask = torch.ones_like(input_ids, dtype=torch.bool)
+        else:
+            attention_mask = attention_mask.bool()
+            
+        if position_ids is None:
+            position_ids = torch.arange(0, input_ids.shape[1], dtype=torch.long, device=input_ids.device)
+        if labels is None:
+            labels = torch.full_like(input_ids, IGNORE_INDEX)
 
-        # Count IMAGE_TOKEN_INDEX occurrences per sequence
-        image_tokens_per_sequence = image_token_mask.sum(dim=1)
+        _input_ids = input_ids
+        input_ids = [cur_input_ids[cur_attention_mask] for cur_input_ids, cur_attention_mask in zip(input_ids, attention_mask)]
+        labels = [cur_labels[cur_attention_mask] for cur_labels, cur_attention_mask in zip(labels, attention_mask)]
+        
+                    
+        _, image_feature_size, embedding_size = image_features.shape
+
 
         # Calculate new sequence lengths after image feature insertions
         # Assuming image_feature_size is the number of tokens each image feature will occupy
-        new_lengths = input_ids.size(1) - image_tokens_per_sequence + (image_tokens_per_sequence * image_feature_size)   
-        max_seq_length = new_lengths.max()
+        # Calculate adjusted lengths for each sequence using list comprehension
+        adjusted_lengths = [
+            len(sequence) - (sequence == IMAGE_TOKEN_INDEX).sum().item() + 
+            (sequence == IMAGE_TOKEN_INDEX).sum().item() * image_feature_size
+            for sequence in input_ids
+        ]
+
+        # Determine max sequence length after adjustments
+        max_seq_length = max(adjusted_lengths)
         batch_size = len(input_ids)   
 
-        new_input_embeds_padded = torch.zeros(batch_size, max_seq_length, embedding_size, dtype=input_ids.dtype, device=input_ids.device)
-        new_labels_padded = torch.full((batch_size, max_seq_length), IGNORE_INDEX, dtype=input_ids.dtype, device=input_ids.device)
+        new_input_embeds_padded = torch.zeros(batch_size, max_seq_length, embedding_size, device=_input_ids.device)
+        new_labels_padded = torch.full((batch_size, max_seq_length), IGNORE_INDEX, dtype=_input_ids.dtype, device=_input_ids.device)
 
         # Step 2: Efficiently integrate image features
         # This step would typically require identifying positions of IMAGE_TOKEN_INDEX in each sequence
@@ -209,8 +233,6 @@ class LlavaMetaForCausalLM(ABC):
             # Calculate the start and end indices for segments without IMAGE_TOKEN_INDEX
             start_indices = torch.cat([torch.tensor([0], device=cur_input_ids.device), image_token_indices + 1])
             end_indices = torch.cat([image_token_indices, torch.tensor([len(cur_input_ids)], device=cur_input_ids.device)])
-            print(image_token_indices,start_indices,end_indices)
-
 
             # Placeholder for the next position in new_input_embeds_padded to fill
             fill_position = 0
@@ -219,10 +241,10 @@ class LlavaMetaForCausalLM(ABC):
                 # Extract and embed the segment of cur_input_ids between IMAGE_TOKEN_INDEX positions
                 segment = cur_input_ids[start_indices[i]:end_indices[i]]
                 if len(segment) > 0:  # Check if the segment is not empty
-                    segment_embeds = self.get_model().embed_tokens(segment.unsqueeze(0))
-                    new_input_embeds_padded[batch_idx, fill_position:fill_position + segment_embeds.size(1), :] = segment_embeds.squeeze(0)
-                    new_labels_padded[batch_idx, fill_position:fill_position + len(segment)] = labels[batch_idx, start_indices[i]:end_indices[i]]
-                    fill_position += segment_embeds.size(1)
+                    segment_embeds = self.get_model().embed_tokens(segment)
+                    new_input_embeds_padded[batch_idx, fill_position:fill_position + segment_embeds.size(0), :] = segment_embeds
+                    new_labels_padded[batch_idx, fill_position:fill_position + len(segment)] = labels[batch_idx][start_indices[i]:end_indices[i]]
+                    fill_position += segment_embeds.size(0)
 
                 # Insert image features after each text segment, except for the last segment
                 if i < num_images:
@@ -231,146 +253,35 @@ class LlavaMetaForCausalLM(ABC):
                     fill_position += image_feature_size
                     cur_image_feature_idx += 1
 
+         # Truncate sequences to max length as image embeddings can make the sequence longer
+        tokenizer_model_max_length = getattr(self.config, 'tokenizer_model_max_length', None)
+        if tokenizer_model_max_length is not None:
+            new_input_embeds_padded = new_input_embeds_padded[:, :tokenizer_model_max_length]
+            new_labels_padded = new_labels_padded[:, :tokenizer_model_max_length]
+        
+        # new_input_embeds_padded = new_input_embeds_padded.to(dtype=)
+        
+        new_input_embeds = new_input_embeds_padded.to(dtype=torch.bfloat16)
+        print(new_input_embeds.dtype)
 
-        new_input_embeds_padded_bk, new_labels_padded_bk = new_input_embeds_padded, new_labels_padded
         #####################
         ## Conlude Changes ##
         #####################
 
-
-        _labels = labels
-        _position_ids = position_ids
-        _attention_mask = attention_mask
-        if attention_mask is None:
-            attention_mask = torch.ones_like(input_ids, dtype=torch.bool)
-        else:
-            attention_mask = attention_mask.bool()
-            
-        if position_ids is None:
-            position_ids = torch.arange(0, input_ids.shape[1], dtype=torch.long, device=input_ids.device)
-        if labels is None:
-            labels = torch.full_like(input_ids, IGNORE_INDEX)
-
-        # remove the padding using attention_mask -- FIXME
-        _input_ids = input_ids
-        input_ids = [cur_input_ids[cur_attention_mask] for cur_input_ids, cur_attention_mask in zip(input_ids, attention_mask)]
-        labels = [cur_labels[cur_attention_mask] for cur_labels, cur_attention_mask in zip(labels, attention_mask)]
-
-        new_input_embeds = []
-        new_labels = []
-        cur_image_idx = 0
-        for batch_idx, cur_input_ids in enumerate(input_ids):
-            num_images = (cur_input_ids == IMAGE_TOKEN_INDEX).sum()
-            if num_images == 0:
-                cur_image_features = image_features[cur_image_idx]
-                cur_input_embeds_1 = self.get_model().embed_tokens(cur_input_ids)
-                # cur_input_embeds = torch.cat([cur_input_embeds_1, cur_image_features[0:0]], dim=0)
-                new_input_embeds.append(cur_input_embeds_1)
-                new_labels.append(labels[batch_idx])
-                cur_image_idx += 1
-                continue
-
-            image_token_indices = [-1] + torch.where(cur_input_ids == IMAGE_TOKEN_INDEX)[0].tolist() + [cur_input_ids.shape[0]]
-            print("************************************")
-            print(image_token_indices)
-            print("************************************")
-            
-            cur_input_ids_noim = []
-            cur_labels = labels[batch_idx]
-            cur_labels_noim = []
-            for i in range(len(image_token_indices) - 1):
-                cur_input_ids_noim.append(cur_input_ids[image_token_indices[i]+1:image_token_indices[i+1]])
-                cur_labels_noim.append(cur_labels[image_token_indices[i]+1:image_token_indices[i+1]])
-
-
-            split_sizes = [x.shape[0] for x in cur_labels_noim]
-            cur_input_embeds = self.get_model().embed_tokens(torch.cat(cur_input_ids_noim))
-            cur_input_embeds_no_im = torch.split(cur_input_embeds, split_sizes, dim=0)
-            cur_new_input_embeds = []
-            cur_new_labels = []
-
-            for i in range(num_images + 1):
-                cur_new_input_embeds.append(cur_input_embeds_no_im[i])
-                cur_new_labels.append(cur_labels_noim[i])
-                if i < num_images:
-                    cur_image_features = image_features[cur_image_idx]
-                    cur_image_idx += 1
-                    cur_new_input_embeds.append(cur_image_features)
-                    cur_new_labels.append(torch.full((cur_image_features.shape[0],), IGNORE_INDEX, device=cur_labels.device, dtype=cur_labels.dtype))
-
-            cur_new_input_embeds = [x.to(self.device) for x in cur_new_input_embeds]
-
-            cur_new_input_embeds = torch.cat(cur_new_input_embeds)
-            cur_new_labels = torch.cat(cur_new_labels)
-
-            new_input_embeds.append(cur_new_input_embeds)
-            new_labels.append(cur_new_labels)
-
-        # Truncate sequences to max length as image embeddings can make the sequence longer
-        tokenizer_model_max_length = getattr(self.config, 'tokenizer_model_max_length', None)
-        if tokenizer_model_max_length is not None:
-            new_input_embeds = [x[:tokenizer_model_max_length] for x in new_input_embeds]
-            new_labels = [x[:tokenizer_model_max_length] for x in new_labels]
-
-        # Combine them
-        max_len = max(x.shape[0] for x in new_input_embeds)
-        batch_size = len(new_input_embeds)
-
-
-        embedding_size = new_input_embeds[0].shape[1]
-        new_input_embeds_padded = torch.zeros(batch_size, max_len, embedding_size, dtype=new_input_embeds[0].dtype, device=new_input_embeds[0].device)
-        new_labels_padded = torch.full((batch_size, max_len), IGNORE_INDEX, dtype=new_labels[0].dtype, device=new_labels[0].device)
-        attention_mask = torch.zeros((batch_size, max_len), dtype=attention_mask.dtype, device=attention_mask.device)
-        position_ids = torch.zeros((batch_size, max_len), dtype=position_ids.dtype, device=position_ids.device)
-
+        attention_mask = torch.zeros((batch_size, max_seq_length), dtype=attention_mask.dtype, device=attention_mask.device)
+        position_ids = torch.zeros((batch_size, max_seq_length), dtype=position_ids.dtype, device=position_ids.device)
 
         # Example sequence lengths
-        sequence_lengths = torch.tensor([len(cur_new_embed) for cur_new_embed in new_input_embeds], dtype=new_labels[0].dtype, device=new_labels[0].device)
+        sequence_lengths = torch.tensor(adjusted_lengths, dtype=new_labels_padded.dtype, device=new_labels_padded.device)
 
         # Create a matrix of positions [batch_size, max_len]
-        position_matrix = torch.arange(max_len).expand(batch_size, -1).to(dtype = sequence_lengths.dtype, device=sequence_lengths.device)
+        position_matrix = torch.arange(max_seq_length).expand(batch_size, -1).to(dtype = sequence_lengths.dtype, device=sequence_lengths.device)
 
         # Create attention_mask by comparing position matrix with sequence lengths
         attention_mask = (position_matrix < sequence_lengths.unsqueeze(1)).to(dtype=_attention_mask.dtype, device=_attention_mask.device)
 
         # Create position_ids similarly, but filled with actual positions; masked positions will not be used
         position_ids = position_matrix * attention_mask
-
-        for i, (embed, label) in enumerate(zip(new_input_embeds, new_labels)):
-
-            new_input_embeds_padded[i, :len(embed)] = embed
-            new_labels_padded[i, :len(label)] = label
-
-        new_input_embeds = new_input_embeds_padded
-
-        # # Efficiently place labels into new_labels_padded based on start_indices
-        # for i, cur_labels in enumerate(new_labels):
-        #     new_labels_padded[i, :sequence_lengths[i]] = cur_labels
-
-        # for i, (cur_new_embed, cur_new_labels) in enumerate(zip(new_input_embeds, new_labels)):
-        #     cur_len = cur_new_embed.shape[0]
-        #     if getattr(self.config, 'tokenizer_padding_side', 'right') == "left":
-        #         new_input_embeds_padded.append(torch.cat((
-        #             torch.zeros((max_len - cur_len, cur_new_embed.shape[1]), dtype=cur_new_embed.dtype, device=cur_new_embed.device),
-        #             cur_new_embed
-        #         ), dim=0))
-        #         if cur_len > 0:
-        #             new_labels_padded[i, -cur_len:] = cur_new_labels
-        #             attention_mask[i, -cur_len:] = True
-        #             position_ids[i, -cur_len:] = torch.arange(0, cur_len, dtype=position_ids.dtype, device=position_ids.device)
-        #         print("left padding")
-        #     else:
-        #         new_input_embeds_padded.append(torch.cat((
-        #             cur_new_embed,
-        #             torch.zeros((max_len - cur_len, cur_new_embed.shape[1]), dtype=cur_new_embed.dtype, device=cur_new_embed.device)
-        #         ), dim=0))
-        #         if cur_len > 0:
-        #             new_labels_padded[i, :cur_len] = cur_new_labels
-        #             attention_mask[i, :cur_len] = True
-        #             position_ids[i, :cur_len] = torch.arange(0, cur_len, dtype=position_ids.dtype, device=position_ids.device)
-        #         print("right padding")
-
-        # new_input_embeds = torch.stack(new_input_embeds_padded, dim=0)
 
         if _labels is None:
             new_labels = None
@@ -385,24 +296,6 @@ class LlavaMetaForCausalLM(ABC):
 
         if _position_ids is None:
             position_ids = None
-        
-        # # Check if all elements match in attention_mask and _attention_mask
-        # attention_mask_equal = (_attention_mask == attention_mask).all()
-
-        # # Check if all elements match in position_ids and _position_ids
-        # position_ids_equal = (_position_ids == position_ids).all()
-
-        # # Print the results
-        # print(f"Attention Mask Equal: {attention_mask_equal}")
-        # print(f"Position IDs Equal: {position_ids_equal}")
-
-        print(f"Size of max sequence length: {max_seq_length}")
-
-        print(f"New implementation:{(new_input_embeds_padded_bk[0] == new_input_embeds_padded[0])}, {(new_input_embeds_padded_bk[1] == new_input_embeds_padded[1])}, {(new_labels_padded_bk == new_labels_padded)}")
-        
-        #print("after:", position_ids, attention_mask, past_key_values, new_input_embeds, new_labels)
-        print("after:", new_input_embeds_padded_bk.shape, new_input_embeds.shape, "|", new_labels_padded_bk.shape, new_labels.shape)
-        exit()
 
         return None, position_ids, attention_mask, past_key_values, new_input_embeds, new_labels
 
