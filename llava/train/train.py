@@ -305,7 +305,7 @@ def _add_speaker_and_signal(header, source, get_conversation=True):
     return conversation
 
 
-def preprocess_multimodal(
+def preprocess_multimodal_old(
     sources: Sequence[str],
     data_args: DataArguments
 ) -> Dict:
@@ -313,6 +313,7 @@ def preprocess_multimodal(
     if not is_multimodal:
         return sources
 
+    print("before processing:", sources)
     for source in sources:
         for sentence in source:
             if DEFAULT_IMAGE_TOKEN in sentence['value']:
@@ -326,6 +327,31 @@ def preprocess_multimodal(
                 replace_token = DEFAULT_IM_START_TOKEN + replace_token + DEFAULT_IM_END_TOKEN
             sentence["value"] = sentence["value"].replace(DEFAULT_IMAGE_TOKEN, replace_token)
 
+    
+    #print("after processing:", sources)
+    return sources
+
+
+def preprocess_multimodal(
+    sources: Sequence[str],
+    data_args: DataArguments
+) -> Dict:
+    is_multimodal = data_args.is_multimodal
+    if not is_multimodal:
+        return sources
+
+    #print("before processing:", sources)
+    for source in sources:
+        for sentence in source:
+            if DEFAULT_IMAGE_TOKEN in sentence['value']:
+                sentence['value'] = sentence['value'].replace(DEFAULT_IMAGE_TOKEN, '<Image>' + DEFAULT_IMAGE_TOKEN + '</Image>').strip()
+            # replace_token = DEFAULT_IMAGE_TOKEN
+            # if data_args.mm_use_im_start_end:
+            #     replace_token = DEFAULT_IM_START_TOKEN + replace_token + DEFAULT_IM_END_TOKEN
+            # sentence["value"] = sentence["value"].replace(DEFAULT_IMAGE_TOKEN, replace_token)
+
+    
+    #print("after processing:", sources)
     return sources
 
 
@@ -391,6 +417,93 @@ def preprocess_llama_2(
             else:
                 round_len = len(tokenizer(rou).input_ids)
                 instruction_len = len(tokenizer(parts[0]).input_ids) - 2
+
+            target[cur_len : cur_len + instruction_len] = IGNORE_INDEX
+
+            cur_len += round_len
+        target[cur_len:] = IGNORE_INDEX
+
+        if cur_len < tokenizer.model_max_length:
+            if cur_len != total_len:
+                target[:] = IGNORE_INDEX
+                print(
+                    f"WARNING: tokenization mismatch: {cur_len} vs. {total_len}."
+                    f" (ignored)"
+                )
+   
+    return dict(
+        input_ids=input_ids,
+        labels=targets,
+    )
+
+
+
+def preprocess_multiimage(
+    sources,
+    tokenizer: transformers.PreTrainedTokenizer,
+    has_image: bool = False
+) -> Dict:
+    conv = conversation_lib.default_conversation.copy()
+    roles = {"human": conv.roles[0], "gpt": conv.roles[1]}
+
+    # Apply prompt templates
+    conversations = []
+    for i, source in enumerate(sources):
+        if roles[source[0]["from"]] != conv.roles[0]:
+            # Skip the first one if it is not from human
+            source = source[1:]
+
+        conv.messages = []
+        for j, sentence in enumerate(source):
+            role = roles[sentence["from"]]
+            assert role == conv.roles[j % 2], f"{i}"
+            conv.append_message(role, sentence["value"])
+        conversations.append(conv.get_prompt())
+
+    # Tokenize conversations
+
+    if has_image:
+        input_ids = torch.stack([tokenizer_image_token(prompt, tokenizer, return_tensors='pt') for prompt in conversations], dim=0)
+    else:
+        input_ids = tokenizer(
+            conversations,
+            return_tensors="pt",
+            padding="longest",
+            max_length=tokenizer.model_max_length,
+            truncation=True,
+        ).input_ids
+
+    targets = input_ids.clone()
+
+    assert conv.sep_style == conversation_lib.SeparatorStyle.TWO
+
+    # Mask targets
+    sep = conv.sep + conv.roles[1] + ": "
+    for conversation, target in zip(conversations, targets):
+        total_len = int(target.ne(tokenizer.pad_token_id).sum())
+
+        rounds = conversation.split(conv.sep2)
+        cur_len = 1
+        target[:cur_len] = IGNORE_INDEX
+        for i, rou in enumerate(rounds):
+            if rou == "":
+                break
+
+            parts = rou.split(sep)
+            if len(parts) != 2:
+                break
+            parts[0] += sep
+
+            if has_image:
+                round_len = len(tokenizer_image_token(rou, tokenizer))
+                instruction_len = len(tokenizer_image_token(parts[0], tokenizer)) - 2
+            else:
+                round_len = len(tokenizer(rou).input_ids)
+                instruction_len = len(tokenizer(parts[0]).input_ids) - 2
+
+            if i != 0 and not tokenizer.legacy and IS_TOKENIZER_GREATER_THAN_0_14:
+                round_len -= 1
+                instruction_len -= 1
 
             target[cur_len : cur_len + instruction_len] = IGNORE_INDEX
 
@@ -490,6 +603,7 @@ def preprocess_v1(
                     f"WARNING: tokenization mismatch: {cur_len} vs. {total_len}."
                     f" (ignored)"
                 )
+    #print(conversations, input_ids, targets)
 
     return dict(
         input_ids=input_ids,
@@ -654,6 +768,19 @@ def preprocess(
 
     return dict(input_ids=input_ids, labels=targets)
 
+# Define the function to expand image to square, keeping existing logic
+def expand2square(pil_img, background_color):
+    width, height = pil_img.size
+    if width == height:
+        return pil_img
+    elif width > height:
+        result = Image.new(pil_img.mode, (width, width), background_color)
+        result.paste(pil_img, (0, (width - height) // 2))
+        return result
+    else:
+        result = Image.new(pil_img.mode, (height, height), background_color)
+        result.paste(pil_img, ((height - width) // 2, 0))
+        return result
 
 class LazySupervisedDataset(Dataset):
     """Dataset for supervised fine-tuning."""
@@ -694,28 +821,30 @@ class LazySupervisedDataset(Dataset):
         if isinstance(i, int):
             sources = [sources]
         assert len(sources) == 1, "Don't know why it is wrapped to a list"  # FIXME
+
         if 'image' in sources[0]:
             image_file = self.list_data_dict[i]['image']
+            
+            #(image_file)
+
+            if not isinstance(image_file, list):
+                image_file = [image_file]
+            #print(image_file)
+
             image_folder = self.data_args.image_folder
-            processor = self.data_args.image_processor
-            image = Image.open(os.path.join(image_folder, image_file)).convert('RGB')
-            if self.data_args.image_aspect_ratio == 'pad':
-                def expand2square(pil_img, background_color):
-                    width, height = pil_img.size
-                    if width == height:
-                        return pil_img
-                    elif width > height:
-                        result = Image.new(pil_img.mode, (width, width), background_color)
-                        result.paste(pil_img, (0, (width - height) // 2))
-                        return result
-                    else:
-                        result = Image.new(pil_img.mode, (height, height), background_color)
-                        result.paste(pil_img, ((height - width) // 2, 0))
-                        return result
-                image = expand2square(image, tuple(int(x*255) for x in processor.image_mean))
-                image = processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
-            else:
-                image = processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
+            processor = self.data_args.image_processor            
+            processed_images = []
+            for img_file in image_file:  # Iterate over each image filename in the list
+                # Open and convert each image
+                image = Image.open(os.path.join(image_folder, img_file)).convert('RGB')
+                if self.data_args.image_aspect_ratio == 'pad':
+                    # Apply padding to make the image square if necessary
+                    image = expand2square(image, tuple(int(x*255) for x in processor.image_mean))
+                # Preprocess the (potentially padded) image and extract pixel values
+                processed_image = processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
+                # Add the processed image to the list
+                processed_images.append(processed_image)
+            
             sources = preprocess_multimodal(
                 copy.deepcopy([e["conversations"] for e in sources]),
                 self.data_args)
@@ -731,11 +860,11 @@ class LazySupervisedDataset(Dataset):
 
         # image exist in the data
         if 'image' in self.list_data_dict[i]:
-            data_dict['image'] = image
+            data_dict['image'] = processed_images
         elif self.data_args.is_multimodal:
             # image does not exist in the data, but the model is multimodal
             crop_size = self.data_args.image_processor.crop_size
-            data_dict['image'] = torch.zeros(3, crop_size['height'], crop_size['width'])
+            data_dict['image'] = [torch.zeros(3, crop_size['height'], crop_size['width'])]
         return data_dict
 
 
@@ -763,13 +892,16 @@ class DataCollatorForSupervisedDataset(object):
             attention_mask=input_ids.ne(self.tokenizer.pad_token_id),
         )
 
-        if 'image' in instances[0]:
-            images = [instance['image'] for instance in instances]
-            if all(x is not None and x.shape == images[0].shape for x in images):
-                batch['images'] = torch.stack(images)
-            else:
-                batch['images'] = images
-
+        #if 'image' in instances[0]:
+            # images = [instance['image'] for instance in instances]
+            # if all(x is not None and x.shape == images[0].shape for x in images):
+            #     batch['images'] = torch.stack(images)
+            # else:
+            #     batch['images'] = images、
+            #print(instances[0],instances[1], len(instances))
+        images = [instance['image'] for instance in instances if 'image' in instance]
+        batch['images'] = images
+        
         return batch
 
 

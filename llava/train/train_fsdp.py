@@ -306,6 +306,7 @@ def _add_speaker_and_signal(header, source, get_conversation=True):
     return conversation
 
 
+
 def preprocess_multimodal(
     sources: Sequence[str],
     data_args: DataArguments
@@ -314,20 +315,20 @@ def preprocess_multimodal(
     if not is_multimodal:
         return sources
 
+    #print("before processing:", sources)
     for source in sources:
         for sentence in source:
             if DEFAULT_IMAGE_TOKEN in sentence['value']:
-                sentence['value'] = sentence['value'].replace(DEFAULT_IMAGE_TOKEN, '').strip()
-                sentence['value'] = DEFAULT_IMAGE_TOKEN + '\n' + sentence['value']
-                sentence['value'] = sentence['value'].strip()
-                if "mmtag" in conversation_lib.default_conversation.version:
-                    sentence['value'] = sentence['value'].replace(DEFAULT_IMAGE_TOKEN, '<Image>' + DEFAULT_IMAGE_TOKEN + '</Image>')
-            replace_token = DEFAULT_IMAGE_TOKEN
-            if data_args.mm_use_im_start_end:
-                replace_token = DEFAULT_IM_START_TOKEN + replace_token + DEFAULT_IM_END_TOKEN
-            sentence["value"] = sentence["value"].replace(DEFAULT_IMAGE_TOKEN, replace_token)
+                sentence['value'] = sentence['value'].replace(DEFAULT_IMAGE_TOKEN, '<Image>' + DEFAULT_IMAGE_TOKEN + '</Image>').strip()
+            # replace_token = DEFAULT_IMAGE_TOKEN
+            # if data_args.mm_use_im_start_end:
+            #     replace_token = DEFAULT_IM_START_TOKEN + replace_token + DEFAULT_IM_END_TOKEN
+            # sentence["value"] = sentence["value"].replace(DEFAULT_IMAGE_TOKEN, replace_token)
 
+    
+    #print("after processing:", sources)
     return sources
+
 
 
 def preprocess_llama_2(
@@ -491,6 +492,7 @@ def preprocess_v1(
                     f"WARNING: tokenization mismatch: {cur_len} vs. {total_len}."
                     f" (ignored)"
                 )
+    #print(conversations, input_ids, targets)
 
     return dict(
         input_ids=input_ids,
@@ -695,28 +697,30 @@ class LazySupervisedDataset(Dataset):
         if isinstance(i, int):
             sources = [sources]
         assert len(sources) == 1, "Don't know why it is wrapped to a list"  # FIXME
+
         if 'image' in sources[0]:
             image_file = self.list_data_dict[i]['image']
+            
+            #(image_file)
+
+            if not isinstance(image_file, list):
+                image_file = [image_file]
+            #print(image_file)
+
             image_folder = self.data_args.image_folder
-            processor = self.data_args.image_processor
-            image = Image.open(os.path.join(image_folder, image_file)).convert('RGB')
-            if self.data_args.image_aspect_ratio == 'pad':
-                def expand2square(pil_img, background_color):
-                    width, height = pil_img.size
-                    if width == height:
-                        return pil_img
-                    elif width > height:
-                        result = Image.new(pil_img.mode, (width, width), background_color)
-                        result.paste(pil_img, (0, (width - height) // 2))
-                        return result
-                    else:
-                        result = Image.new(pil_img.mode, (height, height), background_color)
-                        result.paste(pil_img, ((height - width) // 2, 0))
-                        return result
-                image = expand2square(image, tuple(int(x*255) for x in processor.image_mean))
-                image = processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
-            else:
-                image = processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
+            processor = self.data_args.image_processor            
+            processed_images = []
+            for img_file in image_file:  # Iterate over each image filename in the list
+                # Open and convert each image
+                image = Image.open(os.path.join(image_folder, img_file)).convert('RGB')
+                if self.data_args.image_aspect_ratio == 'pad':
+                    # Apply padding to make the image square if necessary
+                    image = expand2square(image, tuple(int(x*255) for x in processor.image_mean))
+                # Preprocess the (potentially padded) image and extract pixel values
+                processed_image = processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
+                # Add the processed image to the list
+                processed_images.append(processed_image)
+            
             sources = preprocess_multimodal(
                 copy.deepcopy([e["conversations"] for e in sources]),
                 self.data_args)
@@ -732,11 +736,11 @@ class LazySupervisedDataset(Dataset):
 
         # image exist in the data
         if 'image' in self.list_data_dict[i]:
-            data_dict['image'] = image
+            data_dict['image'] = processed_images
         elif self.data_args.is_multimodal:
             # image does not exist in the data, but the model is multimodal
             crop_size = self.data_args.image_processor.crop_size
-            data_dict['image'] = torch.zeros(3, crop_size['height'], crop_size['width'])
+            data_dict['image'] = [torch.zeros(3, crop_size['height'], crop_size['width'])]
         return data_dict
 
 
@@ -764,13 +768,16 @@ class DataCollatorForSupervisedDataset(object):
             attention_mask=input_ids.ne(self.tokenizer.pad_token_id),
         )
 
-        if 'image' in instances[0]:
-            images = [instance['image'] for instance in instances]
-            if all(x is not None and x.shape == images[0].shape for x in images):
-                batch['images'] = torch.stack(images)
-            else:
-                batch['images'] = images
-
+        #if 'image' in instances[0]:
+            # images = [instance['image'] for instance in instances]
+            # if all(x is not None and x.shape == images[0].shape for x in images):
+            #     batch['images'] = torch.stack(images)
+            # else:
+            #     batch['images'] = images、
+            #print(instances[0],instances[1], len(instances))
+        images = [instance['image'] for instance in instances if 'image' in instance]
+        batch['images'] = images
+        
         return batch
 
 
