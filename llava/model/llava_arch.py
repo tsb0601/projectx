@@ -261,7 +261,8 @@ class LlavaMetaForCausalLM(ABC):
         
         # new_input_embeds_padded = new_input_embeds_padded.to(dtype=)
         
-        new_input_embeds = new_input_embeds_padded
+        new_input_embeds = new_input_embeds_padded.to(dtype=torch.bfloat16)
+        print(new_input_embeds.dtype)
 
         #####################
         ## Conlude Changes ##
