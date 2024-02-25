@@ -204,7 +204,7 @@ class LlavaMetaForCausalLM(ABC):
             # Calculate the start and end indices for segments without IMAGE_TOKEN_INDEX
             start_indices = torch.cat([torch.tensor([0], device=cur_input_ids.device), image_token_indices + 1])
             end_indices = torch.cat([image_token_indices, torch.tensor([len(cur_input_ids)], device=cur_input_ids.device)])
-            print(image_token_indices,start_indices,end_indices)
+            #print(image_token_indices,start_indices,end_indices)
 
 
             # Placeholder for the next position in new_input_embeds_padded to fill
@@ -266,9 +266,9 @@ class LlavaMetaForCausalLM(ABC):
                 continue
 
             image_token_indices = [-1] + torch.where(cur_input_ids == IMAGE_TOKEN_INDEX)[0].tolist() + [cur_input_ids.shape[0]]
-            print("************************************")
-            print(image_token_indices)
-            print("************************************")
+            #print("************************************")
+            #print(image_token_indices)
+            #print("************************************")
             
             cur_input_ids_noim = []
             cur_labels = labels[batch_idx]
@@ -391,12 +391,12 @@ class LlavaMetaForCausalLM(ABC):
         # print(f"Attention Mask Equal: {attention_mask_equal}")
         # print(f"Position IDs Equal: {position_ids_equal}")
 
-        print(f"Size of max sequence length: {max_seq_length}")
+        #print(f"Size of max sequence length: {max_seq_length}")
 
-        print(f"New implementation:{(new_input_embeds_padded_bk[0] == new_input_embeds_padded[0])}, {(new_input_embeds_padded_bk[1] == new_input_embeds_padded[1])}, {(new_labels_padded_bk == new_labels_padded)}")
+        #print(f"New implementation:{(new_input_embeds_padded_bk[0] == new_input_embeds_padded[0])}, {(new_input_embeds_padded_bk[1] == new_input_embeds_padded[1])}, {(new_labels_padded_bk == new_labels_padded)}")
         
         #print("after:", position_ids, attention_mask, past_key_values, new_input_embeds, new_labels)
-        print("after:", new_input_embeds_padded_bk.shape, new_input_embeds.shape, "|", new_labels_padded_bk.shape, new_labels.shape)
+        #print("after:", new_input_embeds_padded_bk.shape, new_input_embeds.shape, "|", new_labels_padded_bk.shape, new_labels.shape)
 
         return None, position_ids, attention_mask, past_key_values, new_input_embeds, new_labels
 
