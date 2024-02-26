@@ -261,8 +261,7 @@ class LlavaMetaForCausalLM(ABC):
         
         # new_input_embeds_padded = new_input_embeds_padded.to(dtype=)
         
-        new_input_embeds = new_input_embeds_padded.to(dtype=torch.bfloat16)
-        print(new_input_embeds.dtype)
+
 
         #####################
         ## Conlude Changes ##
@@ -298,7 +297,7 @@ class LlavaMetaForCausalLM(ABC):
         if _position_ids is None:
             position_ids = None
 
-        return None, position_ids, attention_mask, past_key_values, new_input_embeds, new_labels
+        return None, position_ids, attention_mask, past_key_values, new_input_embeds_padded, new_labels
 
     def initialize_vision_tokenizer(self, model_args, tokenizer):
         if model_args.mm_use_im_patch_token:
