@@ -5,6 +5,7 @@ python llava/train/train_spmd.py \
     --version v1 \
     --data_path merged_llava.json \
     --image_folder /mnt/disks/storage/data \
+    --vision_tower openai/clip-vit-large-patch14-336 \
     --mm_projector_type mlp2x_gelu \
     --mm_vision_select_layer -2 \
     --mm_use_im_start_end False \
