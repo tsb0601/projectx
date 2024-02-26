@@ -167,22 +167,43 @@ class LlavaMetaForCausalLM(ABC):
         ## Changes Made for Multi Image ##
         ##################################
             
-        _, image_feature_size, embedding_size = image_features.shape
-    
-        # Create a mask for IMAGE_TOKEN_INDEX positions
-        image_token_mask = (input_ids == IMAGE_TOKEN_INDEX)
+         # remove the padding using attention_mask -- FIXME
+        _labels = labels
+        _position_ids = position_ids
+        _attention_mask = attention_mask
+        if attention_mask is None:
+            attention_mask = torch.ones_like(input_ids, dtype=torch.bool)
+        else:
+            attention_mask = attention_mask.bool()
+            
+        if position_ids is None:
+            position_ids = torch.arange(0, input_ids.shape[1], dtype=torch.long, device=input_ids.device)
+        if labels is None:
+            labels = torch.full_like(input_ids, IGNORE_INDEX)
 
-        # Count IMAGE_TOKEN_INDEX occurrences per sequence
-        image_tokens_per_sequence = image_token_mask.sum(dim=1)
+        _input_ids = input_ids
+        input_ids = [cur_input_ids[cur_attention_mask] for cur_input_ids, cur_attention_mask in zip(input_ids, attention_mask)]
+        labels = [cur_labels[cur_attention_mask] for cur_labels, cur_attention_mask in zip(labels, attention_mask)]
+        
+                    
+        _, image_feature_size, embedding_size = image_features.shape
+
 
         # Calculate new sequence lengths after image feature insertions
         # Assuming image_feature_size is the number of tokens each image feature will occupy
-        new_lengths = input_ids.size(1) - image_tokens_per_sequence + (image_tokens_per_sequence * image_feature_size)   
-        max_seq_length = new_lengths.max()
+        # Calculate adjusted lengths for each sequence using list comprehension
+        adjusted_lengths = [
+            len(sequence) - (sequence == IMAGE_TOKEN_INDEX).sum().item() + 
+            (sequence == IMAGE_TOKEN_INDEX).sum().item() * image_feature_size
+            for sequence in input_ids
+        ]
+
+        # Determine max sequence length after adjustments
+        max_seq_length = max(adjusted_lengths)
         batch_size = len(input_ids)   
 
-        new_input_embeds_padded = torch.zeros(batch_size, max_seq_length, embedding_size, dtype=input_ids.dtype, device=input_ids.device)
-        new_labels_padded = torch.full((batch_size, max_seq_length), IGNORE_INDEX, dtype=input_ids.dtype, device=input_ids.device)
+        new_input_embeds_padded = torch.zeros(batch_size, max_seq_length, embedding_size, device=_input_ids.device)
+        new_labels_padded = torch.full((batch_size, max_seq_length), IGNORE_INDEX, dtype=_input_ids.dtype, device=_input_ids.device)
 
         # Step 2: Efficiently integrate image features
         # This step would typically require identifying positions of IMAGE_TOKEN_INDEX in each sequence
@@ -204,8 +225,6 @@ class LlavaMetaForCausalLM(ABC):
             # Calculate the start and end indices for segments without IMAGE_TOKEN_INDEX
             start_indices = torch.cat([torch.tensor([0], device=cur_input_ids.device), image_token_indices + 1])
             end_indices = torch.cat([image_token_indices, torch.tensor([len(cur_input_ids)], device=cur_input_ids.device)])
-            #print(image_token_indices,start_indices,end_indices)
-
 
             # Placeholder for the next position in new_input_embeds_padded to fill
             fill_position = 0
@@ -214,10 +233,10 @@ class LlavaMetaForCausalLM(ABC):
                 # Extract and embed the segment of cur_input_ids between IMAGE_TOKEN_INDEX positions
                 segment = cur_input_ids[start_indices[i]:end_indices[i]]
                 if len(segment) > 0:  # Check if the segment is not empty
-                    segment_embeds = self.get_model().embed_tokens(segment.unsqueeze(0))
-                    new_input_embeds_padded[batch_idx, fill_position:fill_position + segment_embeds.size(1), :] = segment_embeds.squeeze(0)
-                    new_labels_padded[batch_idx, fill_position:fill_position + len(segment)] = labels[batch_idx, start_indices[i]:end_indices[i]]
-                    fill_position += segment_embeds.size(1)
+                    segment_embeds = self.get_model().embed_tokens(segment)
+                    new_input_embeds_padded[batch_idx, fill_position:fill_position + segment_embeds.size(0), :] = segment_embeds
+                    new_labels_padded[batch_idx, fill_position:fill_position + len(segment)] = labels[batch_idx][start_indices[i]:end_indices[i]]
+                    fill_position += segment_embeds.size(0)
 
                 # Insert image features after each text segment, except for the last segment
                 if i < num_images:
@@ -226,8 +245,16 @@ class LlavaMetaForCausalLM(ABC):
                     fill_position += image_feature_size
                     cur_image_feature_idx += 1
 
+         # Truncate sequences to max length as image embeddings can make the sequence longer
+        tokenizer_model_max_length = getattr(self.config, 'tokenizer_model_max_length', None)
+        if tokenizer_model_max_length is not None:
+            new_input_embeds_padded = new_input_embeds_padded[:, :tokenizer_model_max_length]
+            new_labels_padded = new_labels_padded[:, :tokenizer_model_max_length]
+        
+        # new_input_embeds_padded = new_input_embeds_padded.to(dtype=)
+        
+        new_input_embeds_bk = new_input_embeds_padded.to(dtype=torch.bfloat16)
 
-        new_input_embeds_padded_bk, new_labels_padded_bk = new_input_embeds_padded, new_labels_padded
         #####################
         ## Conlude Changes ##
         #####################
@@ -337,7 +364,9 @@ class LlavaMetaForCausalLM(ABC):
             new_labels_padded[i, :len(label)] = label
 
         new_input_embeds = new_input_embeds_padded
-        
+
+        print("Two Implementations:", (new_input_embeds_bk == new_input_embeds).all())
+
         print(new_input_embeds.dtype)
 
         # # Efficiently place labels into new_labels_padded based on start_indices
