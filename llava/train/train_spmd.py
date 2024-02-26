@@ -44,8 +44,7 @@ import torch_xla.runtime as xr
 
 
 import wandb
-wandb.login(key='ed3fdff5ab6fba82056002ff9eafa951bf24ec14')
-wandb.init(project='llava_tpu', entity='benchmark_vllm')
+
 
 # Enable SPMD mode execution
 xr.use_spmd()
