@@ -361,6 +361,7 @@ class LlavaMetaForCausalLM(ABC):
         new_input_embeds = new_input_embeds_padded
 
         print("Two Implementations:", (new_input_embeds_bk == new_input_embeds).all())
+        print(f"new_input_embeds_bk dtype: {new_input_embeds_bk.dtype} and new_input_embeds dtype: {new_input_embeds.dtype}")
 
         print(new_input_embeds.dtype)
 
