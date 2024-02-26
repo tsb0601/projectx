@@ -424,7 +424,7 @@ class LlavaMetaForCausalLM(ABC):
         #print("after:", position_ids, attention_mask, past_key_values, new_input_embeds, new_labels)
         #print("after:", new_input_embeds_padded_bk.shape, new_input_embeds.shape, "|", new_labels_padded_bk.shape, new_labels.shape)
 
-        return None, position_ids, attention_mask, past_key_values, new_input_embeds, new_labels
+        return None, position_ids, attention_mask, past_key_values, new_input_embeds_bk, new_labels
 
     def initialize_vision_tokenizer(self, model_args, tokenizer):
         if model_args.mm_use_im_patch_token:
