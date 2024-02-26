@@ -337,6 +337,8 @@ class LlavaMetaForCausalLM(ABC):
             new_labels_padded[i, :len(label)] = label
 
         new_input_embeds = new_input_embeds_padded
+        
+        print(new_input_embeds.dtype)
 
         # # Efficiently place labels into new_labels_padded based on start_indices
         # for i, cur_labels in enumerate(new_labels):
