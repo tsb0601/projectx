@@ -1,12 +1,11 @@
 #!/bin/bash
 
 python llava/train/train_spmd.py \
-    --deepspeed /home/tsb/projectx/scripts/zero2.json \
     --model_name_or_path /mnt/disks/storage/llm_ckpts/vicuna1.5 \
-    --version plain \
-    --data_path /mnt/disks/storage/data/pretrain_data/blip_laion_cc_sbu_558k.json \
+    --version v1 \
+    --data_path merged_llava.json \
     --image_folder /mnt/disks/storage/data/pretrain_data \
-    --vision_tower openai/clip-vit-large-patch14-336 \
+    --image_folder /mnt/disks/storage/data \
     --mm_projector_type mlp2x_gelu \
     --mm_vision_select_layer -2 \
     --mm_use_im_start_end False \
