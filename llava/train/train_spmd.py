@@ -1049,8 +1049,8 @@ def train(attn_implementation=None):
     
     #print(model)
 
-    for i, block in enumerate(model.model.mm_projector):
-        xs.apply_backward_optimization_barrier(model.model.mm_projector[i])
+    # for i, block in enumerate(model.model.mm_projector):
+    #     xs.apply_backward_optimization_barrier(model.model.mm_projector[i])
 
     for i, block in enumerate(model.model.layers):
         # LLaMA-specific
