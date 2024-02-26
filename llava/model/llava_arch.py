@@ -254,6 +254,7 @@ class LlavaMetaForCausalLM(ABC):
         # new_input_embeds_padded = new_input_embeds_padded.to(dtype=)
         
         new_input_embeds_bk = new_input_embeds_padded
+        new_labels_padded_bk = new_labels_padded
 
         #####################
         ## Conlude Changes ##
@@ -361,8 +362,9 @@ class LlavaMetaForCausalLM(ABC):
         new_input_embeds = new_input_embeds_padded
 
         print("Two Implementations:", (new_input_embeds_bk == new_input_embeds).all())
+        print("Two Implementations:", (new_labels_padded_bk == new_labels_padded).all())
         print(f"new_input_embeds_bk dtype: {new_input_embeds_bk.dtype} and new_input_embeds dtype: {new_input_embeds.dtype}")
-
+        print(f"new_labels_padded_bk dtype: {new_labels_padded_bk.dtype} and new_labels_padded dtype: {new_labels_padded.dtype}")
         print(new_input_embeds.dtype)
 
         # # Efficiently place labels into new_labels_padded based on start_indices
@@ -425,7 +427,7 @@ class LlavaMetaForCausalLM(ABC):
         #print("after:", position_ids, attention_mask, past_key_values, new_input_embeds, new_labels)
         #print("after:", new_input_embeds_padded_bk.shape, new_input_embeds.shape, "|", new_labels_padded_bk.shape, new_labels.shape)
 
-        return None, position_ids, attention_mask, past_key_values, new_input_embeds_bk, new_labels
+        return None, position_ids, attention_mask, past_key_values, new_input_embeds_bk, new_labels_padded_bk
 
     def initialize_vision_tokenizer(self, model_args, tokenizer):
         if model_args.mm_use_im_patch_token:
