@@ -1057,10 +1057,10 @@ def train(attn_implementation=None):
         xs.apply_backward_optimization_barrier(model.model.layers[i])
 
     print("Applying gradient checkpointing")
-    from torch_xla.distributed.fsdp import checkpoint_module
-    for i, block in enumerate(model.model.vision_tower.vision_tower.vision_model.encoder.layers):
-        # CLIP-specific
-        model.model.vision_tower.vision_tower.vision_model.encoder.layers[i] = checkpoint_module(block)
+    # from torch_xla.distributed.fsdp import checkpoint_module
+    # for i, block in enumerate(model.model.vision_tower.vision_tower.vision_model.encoder.layers):
+    #     # CLIP-specific
+    #     model.model.vision_tower.vision_tower.vision_model.encoder.layers[i] = checkpoint_module(block)
 
 
     for i, block in enumerate(model.model.layers):
