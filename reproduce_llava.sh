@@ -12,7 +12,7 @@ python llava/train/train_tpu.py \
     --bf16 True \
     --output_dir ./checkpoints/llava-v1.5-13b \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 22 \
+    --per_device_train_batch_size 20 \
     --group_by_modality_length True \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
