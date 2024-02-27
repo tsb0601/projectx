@@ -194,8 +194,12 @@ class LlavaMetaForCausalLM(ABC):
         labels = [cur_labels[cur_attention_mask] for cur_labels, cur_attention_mask in zip(labels, attention_mask)]
         
                     
-        _, image_feature_size, embedding_size = image_features.shape
-
+        if image_features is not None:
+            _, image_feature_size, embedding_size = image_features.shape
+        else:
+            image_feature_size = 0
+            embedding_size = 4096
+            
 
         # Calculate new sequence lengths after image feature insertions
         # Assuming image_feature_size is the number of tokens each image feature will occupy
