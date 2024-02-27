@@ -17,7 +17,7 @@ from typing import List, Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
-import torch_xla
+
 from transformers import AutoConfig, AutoModelForCausalLM, \
                          LlamaConfig, LlamaModel, LlamaForCausalLM
 
