@@ -212,14 +212,15 @@ def safe_save_model_for_hf_trainer(trainer: transformers.Trainer,
         trainer.save_model(output_dir)
         return
 
-    state_dict = trainer.model.state_dict()
-    if trainer.args.should_save:
-        cpu_state_dict = {
-            key: value.cpu()
-            for key, value in state_dict.items()
-        }
-        del state_dict
-        trainer._save(output_dir, state_dict=cpu_state_dict)  # noqa
+    trainer._save(output_dir)
+    # state_dict = trainer.model.state_dict()
+    # if trainer.args.should_save:
+    #     cpu_state_dict = {
+    #         key: value.cpu()
+    #         for key, value in state_dict.items()
+    #     }
+    #     del state_dict
+    #     trainer._save(output_dir, state_dict=cpu_state_dict)  # noqa
 
 
 def smart_tokenizer_and_embedding_resize(
@@ -306,7 +307,6 @@ def _add_speaker_and_signal(header, source, get_conversation=True):
     return conversation
 
 
-
 def preprocess_multimodal(
     sources: Sequence[str],
     data_args: DataArguments
@@ -315,20 +315,20 @@ def preprocess_multimodal(
     if not is_multimodal:
         return sources
 
-    #print("before processing:", sources)
     for source in sources:
         for sentence in source:
             if DEFAULT_IMAGE_TOKEN in sentence['value']:
-                sentence['value'] = sentence['value'].replace(DEFAULT_IMAGE_TOKEN, '<Image>' + DEFAULT_IMAGE_TOKEN + '</Image>').strip()
-            # replace_token = DEFAULT_IMAGE_TOKEN
-            # if data_args.mm_use_im_start_end:
-            #     replace_token = DEFAULT_IM_START_TOKEN + replace_token + DEFAULT_IM_END_TOKEN
-            # sentence["value"] = sentence["value"].replace(DEFAULT_IMAGE_TOKEN, replace_token)
+                sentence['value'] = sentence['value'].replace(DEFAULT_IMAGE_TOKEN, '').strip()
+                sentence['value'] = DEFAULT_IMAGE_TOKEN + '\n' + sentence['value']
+                sentence['value'] = sentence['value'].strip()
+                if "mmtag" in conversation_lib.default_conversation.version:
+                    sentence['value'] = sentence['value'].replace(DEFAULT_IMAGE_TOKEN, '<Image>' + DEFAULT_IMAGE_TOKEN + '</Image>')
+            replace_token = DEFAULT_IMAGE_TOKEN
+            if data_args.mm_use_im_start_end:
+                replace_token = DEFAULT_IM_START_TOKEN + replace_token + DEFAULT_IM_END_TOKEN
+            sentence["value"] = sentence["value"].replace(DEFAULT_IMAGE_TOKEN, replace_token)
 
-    
-    #print("after processing:", sources)
     return sources
-
 
 
 def preprocess_llama_2(
@@ -492,7 +492,6 @@ def preprocess_v1(
                     f"WARNING: tokenization mismatch: {cur_len} vs. {total_len}."
                     f" (ignored)"
                 )
-    #print(conversations, input_ids, targets)
 
     return dict(
         input_ids=input_ids,
@@ -697,30 +696,28 @@ class LazySupervisedDataset(Dataset):
         if isinstance(i, int):
             sources = [sources]
         assert len(sources) == 1, "Don't know why it is wrapped to a list"  # FIXME
-
         if 'image' in sources[0]:
             image_file = self.list_data_dict[i]['image']
-            
-            #(image_file)
-
-            if not isinstance(image_file, list):
-                image_file = [image_file]
-            #print(image_file)
-
             image_folder = self.data_args.image_folder
-            processor = self.data_args.image_processor            
-            processed_images = []
-            for img_file in image_file:  # Iterate over each image filename in the list
-                # Open and convert each image
-                image = Image.open(os.path.join(image_folder, img_file)).convert('RGB')
-                if self.data_args.image_aspect_ratio == 'pad':
-                    # Apply padding to make the image square if necessary
-                    image = expand2square(image, tuple(int(x*255) for x in processor.image_mean))
-                # Preprocess the (potentially padded) image and extract pixel values
-                processed_image = processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
-                # Add the processed image to the list
-                processed_images.append(processed_image)
-            
+            processor = self.data_args.image_processor
+            image = Image.open(os.path.join(image_folder, image_file)).convert('RGB')
+            if self.data_args.image_aspect_ratio == 'pad':
+                def expand2square(pil_img, background_color):
+                    width, height = pil_img.size
+                    if width == height:
+                        return pil_img
+                    elif width > height:
+                        result = Image.new(pil_img.mode, (width, width), background_color)
+                        result.paste(pil_img, (0, (width - height) // 2))
+                        return result
+                    else:
+                        result = Image.new(pil_img.mode, (height, height), background_color)
+                        result.paste(pil_img, ((height - width) // 2, 0))
+                        return result
+                image = expand2square(image, tuple(int(x*255) for x in processor.image_mean))
+                image = processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
+            else:
+                image = processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
             sources = preprocess_multimodal(
                 copy.deepcopy([e["conversations"] for e in sources]),
                 self.data_args)
@@ -736,10 +733,66 @@ class LazySupervisedDataset(Dataset):
 
         # image exist in the data
         if 'image' in self.list_data_dict[i]:
-            data_dict['image'] = processed_images
-       
+            data_dict['image'] = image
+        elif self.data_args.is_multimodal:
+            # image does not exist in the data, but the model is multimodal
+            crop_size = self.data_args.image_processor.crop_size
+            data_dict['image'] = torch.zeros(3, crop_size['height'], crop_size['width'])
         return data_dict
 
+def prepare_multimodal_data(input_ids, labels, attention_mask, image_token_len=576, max_length=2048):
+    input_ids_im_replaced = []
+    labels_im_replaced = []
+    attention_mask_im_replaced = []
+    position_ids_im_replaced = []
+    # insert the padding tokens to the places of image so we can embed them together
+    for batch_idx, cur_input_ids in enumerate(input_ids):
+        num_images = (cur_input_ids == IMAGE_TOKEN_INDEX).sum()
+
+        image_token_indices = [-1] + torch.where(cur_input_ids == IMAGE_TOKEN_INDEX)[0].tolist() + [cur_input_ids.shape[0]]
+
+        cur_input_ids_im_replaced = []
+        cur_labels_im_replaced = []
+        cur_attention_mask_im_replaced = []
+        cur_position_ids_im_replaced = []
+        
+        cur_labels = labels[batch_idx]
+        cur_attention_mask = attention_mask[batch_idx]
+        index = 0
+        for i in range(len(image_token_indices) - 1):
+            # still keep the first image token in input_ids for further use
+            cur_input_ids_im_replaced.append(cur_input_ids[image_token_indices[i]+1:image_token_indices[i+1]+1])
+            cur_labels_im_replaced.append(cur_labels[image_token_indices[i]+1:image_token_indices[i+1]])
+            cur_attention_mask_im_replaced.append(cur_attention_mask[image_token_indices[i]+1:image_token_indices[i+1]])
+            cur_position_ids_im_replaced.append(torch.arange(index, index+image_token_indices[i+1]-(image_token_indices[i]+1), dtype=torch.long, device=cur_input_ids.device))
+            index += image_token_indices[i+1]-(image_token_indices[i]+1)
+            
+            if i < len(image_token_indices) - 2:
+                cur_input_ids_im_replaced.append(torch.full((image_token_len-1,), 0, device=cur_input_ids.device, dtype=cur_input_ids.dtype))
+                cur_labels_im_replaced.append(torch.full((image_token_len,), IGNORE_INDEX, device=cur_labels.device, dtype=cur_labels.dtype))
+                if cur_attention_mask[image_token_indices[i+1]]:    
+                    cur_attention_mask_im_replaced.append(torch.full((image_token_len,), 1, device=cur_attention_mask.device, dtype=cur_attention_mask.dtype))
+                    cur_position_ids_im_replaced.append(torch.arange(index, index+image_token_len, dtype=torch.long, device=cur_input_ids.device))
+                    index += image_token_len
+                else:
+                    cur_attention_mask_im_replaced.append(torch.full((image_token_len,), 0, device=cur_attention_mask.device, dtype=cur_attention_mask.dtype))
+                    cur_position_ids_im_replaced.append(torch.full((image_token_len,), 0, device=cur_input_ids.device, dtype=torch.long))
+        
+        input_ids_im_replaced.append(torch.cat(cur_input_ids_im_replaced))
+        labels_im_replaced.append(torch.cat(cur_labels_im_replaced))
+        attention_mask_im_replaced.append(torch.cat(cur_attention_mask_im_replaced))
+        position_ids_im_replaced.append(torch.cat(cur_position_ids_im_replaced))
+    
+    # Truncate sequences to max length as image embeddings can make the sequence longer
+    new_input_ids = [x[0:max_length] for x in input_ids_im_replaced]
+    new_labels = [x[0:max_length] for x in labels_im_replaced]
+    new_attention_mask = [x[0:max_length] for x in attention_mask_im_replaced]
+    new_position_ids = [x[0:max_length] for x in position_ids_im_replaced]
+    new_input_ids = torch.stack(new_input_ids)
+    new_labels = torch.stack(new_labels)
+    new_attention_mask = torch.stack(new_attention_mask)
+    new_position_ids = torch.stack(new_position_ids)
+    return new_input_ids, new_labels, new_attention_mask, new_position_ids
 
 @dataclass
 class DataCollatorForSupervisedDataset(object):
@@ -748,33 +801,57 @@ class DataCollatorForSupervisedDataset(object):
     tokenizer: transformers.PreTrainedTokenizer
 
     def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
+
+        image_token_len = 576
+        image_position = 35
+
         input_ids, labels = tuple([instance[key] for instance in instances]
                                   for key in ("input_ids", "labels"))
-        input_ids = torch.nn.utils.rnn.pad_sequence(
-            input_ids,
-            batch_first=True,
-            padding_value=self.tokenizer.pad_token_id)
-        labels = torch.nn.utils.rnn.pad_sequence(labels,
-                                                 batch_first=True,
-                                                 padding_value=IGNORE_INDEX)
-        input_ids = input_ids[:, :self.tokenizer.model_max_length]
-        labels = labels[:, :self.tokenizer.model_max_length]
+        max_length = self.tokenizer.model_max_length
+
+        padding_side = self.tokenizer.padding_side 
+        if padding_side == "left":
+            input_ids = [t[:max_length] if t.shape[0] >= max_length else torch.nn.functional.pad(t, (max_length - t.shape[0], 0), 'constant', self.tokenizer.pad_token_id) for t in input_ids]
+            labels = [t[:max_length] if t.shape[0] >= max_length else torch.nn.functional.pad(t, ( max_length - t.shape[0], 0), 'constant', IGNORE_INDEX) for t in labels]
+        else:
+            input_ids = [t[:max_length] if t.shape[0] >= max_length else torch.nn.functional.pad(t, (0, max_length - t.shape[0]), 'constant', self.tokenizer.pad_token_id) for t in input_ids]
+            labels = [t[:max_length] if t.shape[0] >= max_length else torch.nn.functional.pad(t, (0, max_length - t.shape[0]), 'constant', IGNORE_INDEX) for t in labels]
+
+        input_ids = torch.stack(input_ids)
+        labels = torch.stack(labels)
+        attention_mask= input_ids.ne(self.tokenizer.pad_token_id)
+        # insert dummy image
+        for i in range(len(input_ids)):
+            if (input_ids[i] == IMAGE_TOKEN_INDEX).sum() == 0:
+                cur_input_ids_tmp = input_ids[i].clone()
+                cur_input_ids_tmp[image_position+1:] = input_ids[i, image_position:-1]
+                cur_input_ids_tmp[image_position] = IMAGE_TOKEN_INDEX
+                input_ids[i] = cur_input_ids_tmp
+
+                cur_labels_tmp = labels[i].clone()
+                cur_labels_tmp[image_position+1:] = labels[i, image_position:-1]
+                cur_labels_tmp[image_position] = IGNORE_INDEX
+                labels[i] = cur_labels_tmp
+
+                cur_attention_mask_tmp = attention_mask[i].clone()
+                cur_attention_mask_tmp[image_position+1:] = attention_mask[i, image_position:-1]
+                cur_attention_mask_tmp[image_position] = False
+                attention_mask[i] = cur_attention_mask_tmp
+        new_input_ids, new_labels, new_attention_mask, new_position_ids = prepare_multimodal_data(input_ids, labels, attention_mask, image_token_len, max_length)
         batch = dict(
-            input_ids=input_ids,
-            labels=labels,
-            attention_mask=input_ids.ne(self.tokenizer.pad_token_id),
+            input_ids=new_input_ids,
+            labels=new_labels,
+            attention_mask=new_attention_mask,
+            position_ids=new_position_ids
         )
 
-        #if 'image' in instances[0]:
-            # images = [instance['image'] for instance in instances]
-            # if all(x is not None and x.shape == images[0].shape for x in images):
-            #     batch['images'] = torch.stack(images)
-            # else:
-            #     batch['images'] = images、
-            #print(instances[0],instances[1], len(instances))
-        images = [instance['image'] for instance in instances if 'image' in instance]
-        batch['images'] = images
-        
+        if 'image' in instances[0]:
+            images = [instance['image'] for instance in instances]
+            if all(x is not None and x.shape == images[0].shape for x in images):
+                batch['images'] = torch.stack(images)
+            else:
+                batch['images'] = images
+
         return batch
 
 
@@ -840,7 +917,6 @@ def train(INDEX, attn_implementation=None):
 
 
 
-
     bnb_model_from_pretrained_args = {}
     if training_args.bits in [4, 8]:
         from transformers import BitsAndBytesConfig
@@ -863,6 +939,7 @@ def train(INDEX, attn_implementation=None):
     
     
 
+
     if model_args.vision_tower is not None:
         if 'mpt' in model_args.model_name_or_path:
             config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
@@ -874,12 +951,10 @@ def train(INDEX, attn_implementation=None):
                 **bnb_model_from_pretrained_args
             )
         else:
-            
             model = LlavaLlamaForCausalLM.from_pretrained(
                 model_args.model_name_or_path,
                 cache_dir=training_args.cache_dir,
                 torch_dtype=None,
-                do_sample=True,
                 **bnb_model_from_pretrained_args
             )
     else:
@@ -890,8 +965,8 @@ def train(INDEX, attn_implementation=None):
             torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
             **bnb_model_from_pretrained_args
         )
-
     model.config.use_cache = False
+    model.generation_config.do_sample = True
 
     if model_args.freeze_backbone:
         model.model.requires_grad_(False)
@@ -901,13 +976,13 @@ def train(INDEX, attn_implementation=None):
         model.config.torch_dtype=(torch.float32 if training_args.fp16 else (torch.bfloat16 if training_args.bf16 else torch.float32))
         model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=training_args.gradient_checkpointing)
 
-    # if training_args.gradient_checkpointing:
-    #     if hasattr(model, "enable_input_require_grads"):
-    #         model.enable_input_require_grads()
-    #     else:
-    #         def make_inputs_require_grad(module, input, output):
-    #             output.requires_grad_(True)
-    #         model.get_input_embeddings().register_forward_hook(make_inputs_require_grad)
+    if training_args.gradient_checkpointing:
+        if hasattr(model, "enable_input_require_grads"):
+            model.enable_input_require_grads()
+        else:
+            def make_inputs_require_grad(module, input, output):
+                output.requires_grad_(True)
+            model.get_input_embeddings().register_forward_hook(make_inputs_require_grad)
 
     if training_args.lora_enable:
         from peft import LoraConfig, get_peft_model
@@ -990,7 +1065,6 @@ def train(INDEX, attn_implementation=None):
         if training_args.bits in [4, 8]:
             model.get_model().mm_projector.to(dtype=compute_dtype, device=training_args.device)
 
-        
         model.config.mm_use_im_start_end = data_args.mm_use_im_start_end = model_args.mm_use_im_start_end
         model.config.mm_projector_lr = training_args.mm_projector_lr
         training_args.use_im_start_end = model_args.mm_use_im_start_end
@@ -1041,14 +1115,12 @@ def train(INDEX, attn_implementation=None):
     # xm.optimizer_step = patched_optimizer_step
 
 
-    #convert_to_bf16_except_llama(model)
-
+    # convert_to_bf16_except_llama(model)
 
     trainer = LLaVATrainer(model=model,
                     tokenizer=tokenizer,
                     args=training_args,
                     **data_module)
-    
 
     if list(pathlib.Path(training_args.output_dir).glob("checkpoint-*")):
         trainer.train(resume_from_checkpoint=True)
