@@ -821,22 +821,22 @@ class DataCollatorForSupervisedDataset(object):
 		labels = torch.stack(labels)
 		attention_mask= input_ids.ne(self.tokenizer.pad_token_id)
 		# insert dummy image
-		for i in range(len(input_ids)):
-			if (input_ids[i] == IMAGE_TOKEN_INDEX).sum() == 0:
-				cur_input_ids_tmp = input_ids[i].clone()
-				cur_input_ids_tmp[image_position+1:] = input_ids[i, image_position:-1]
-				cur_input_ids_tmp[image_position] = IMAGE_TOKEN_INDEX
-				input_ids[i] = cur_input_ids_tmp
+		# for i in range(len(input_ids)):
+		# 	if (input_ids[i] == IMAGE_TOKEN_INDEX).sum() == 0:
+		# 		cur_input_ids_tmp = input_ids[i].clone()
+		# 		cur_input_ids_tmp[image_position+1:] = input_ids[i, image_position:-1]
+		# 		cur_input_ids_tmp[image_position] = IMAGE_TOKEN_INDEX
+		# 		input_ids[i] = cur_input_ids_tmp
 
-				cur_labels_tmp = labels[i].clone()
-				cur_labels_tmp[image_position+1:] = labels[i, image_position:-1]
-				cur_labels_tmp[image_position] = IGNORE_INDEX
-				labels[i] = cur_labels_tmp
+		# 		cur_labels_tmp = labels[i].clone()
+		# 		cur_labels_tmp[image_position+1:] = labels[i, image_position:-1]
+		# 		cur_labels_tmp[image_position] = IGNORE_INDEX
+		# 		labels[i] = cur_labels_tmp
 
-				cur_attention_mask_tmp = attention_mask[i].clone()
-				cur_attention_mask_tmp[image_position+1:] = attention_mask[i, image_position:-1]
-				cur_attention_mask_tmp[image_position] = False
-				attention_mask[i] = cur_attention_mask_tmp
+		# 		cur_attention_mask_tmp = attention_mask[i].clone()
+		# 		cur_attention_mask_tmp[image_position+1:] = attention_mask[i, image_position:-1]
+		# 		cur_attention_mask_tmp[image_position] = False
+		# 		attention_mask[i] = cur_attention_mask_tmp
 		new_input_ids, new_labels, new_attention_mask, new_position_ids = prepare_multimodal_data(input_ids, labels, attention_mask, image_token_len, max_length)
 		batch = dict(
 			input_ids=new_input_ids,
