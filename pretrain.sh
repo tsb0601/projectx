@@ -1,7 +1,7 @@
 #!/bin/bash
 
 python llava/train/train_tpu.py \
-    --model_name_or_path /mnt/disks/storage/llm_ckpts/vicuna1.5 \
+    --model_name_or_path lmsys/vicuna-7b-v1.5 \
     --version plain \
     --data_path /mnt/disks/storage/data/pretrain_data/blip_laion_cc_sbu_558k.json \
     --image_folder /mnt/disks/storage/data \
@@ -14,7 +14,7 @@ python llava/train/train_tpu.py \
     --bf16 True \
     --output_dir ./checkpoints/llava-v1.5-13b-pretrain \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 6 \
+    --per_device_train_batch_size 2 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \
