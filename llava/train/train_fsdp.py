@@ -750,6 +750,8 @@ def prepare_multimodal_data(input_ids, labels, attention_mask, image_token_len=5
 		num_images = (cur_input_ids == IMAGE_TOKEN_INDEX).sum()
 
 		image_token_indices = [-1] + torch.where(cur_input_ids == IMAGE_TOKEN_INDEX)[0].tolist() + [cur_input_ids.shape[0]]
+		# start_indices = [0] + (torch.where(cur_input_ids == IMAGE_TOKEN_INDEX)[0]+1).tolist()
+		# end_indices = torch.where(cur_input_ids == IMAGE_TOKEN_INDEX)[0].tolist() + [cur_input_ids.shape[0]]
 
 		cur_input_ids_im_replaced = []
 		cur_labels_im_replaced = []
@@ -761,7 +763,7 @@ def prepare_multimodal_data(input_ids, labels, attention_mask, image_token_len=5
 		index = 0
 		for i in range(len(image_token_indices) - 1):
 			# still keep the first image token in input_ids for further use
-			cur_input_ids_im_replaced.append(cur_input_ids[image_token_indices[i]+1:image_token_indices[i+1]+1])
+			cur_input_ids_im_replaced.append(cur_input_ids[image_token_indices[i]+1:image_token_indices[i+1]])
 			cur_labels_im_replaced.append(cur_labels[image_token_indices[i]+1:image_token_indices[i+1]])
 			cur_attention_mask_im_replaced.append(cur_attention_mask[image_token_indices[i]+1:image_token_indices[i+1]])
 			cur_position_ids_im_replaced.append(torch.arange(index, index+image_token_indices[i+1]-(image_token_indices[i]+1), dtype=torch.long, device=cur_input_ids.device))
@@ -838,6 +840,7 @@ class DataCollatorForSupervisedDataset(object):
 		# 		cur_attention_mask_tmp[image_position] = False
 		# 		attention_mask[i] = cur_attention_mask_tmp
 		new_input_ids, new_labels, new_attention_mask, new_position_ids = prepare_multimodal_data(input_ids, labels, attention_mask, image_token_len, max_length)
+		
 		batch = dict(
 			input_ids=new_input_ids,
 			labels=new_labels,
