@@ -12,9 +12,9 @@ python llava/train/train_tpu.py \
     --mm_use_im_start_end False \
     --mm_use_im_patch_token False \
     --bf16 True \
-    --output_dir ./checkpoints/llava-v1.5-13b-pretrain \
+    --output_dir ./checkpoints/llava-v1.5-7b-pretrain \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 2 \
+    --per_device_train_batch_size 4 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \
