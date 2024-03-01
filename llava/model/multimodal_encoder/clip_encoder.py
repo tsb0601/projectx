@@ -21,9 +21,13 @@ class CLIPVisionTower(nn.Module):
         else:
             self.cfg_only = CLIPVisionConfig.from_pretrained(self.vision_tower_name)
 
-    def load_model(self):
+    def load_model(self, device_map=None):
+        if self.is_loaded:
+            print('{} is already loaded, `load_model` called again, skipping.'.format(self.vision_tower_name))
+            return
+
         self.image_processor = CLIPImageProcessor.from_pretrained(self.vision_tower_name)
-        self.vision_tower = CLIPVisionModel.from_pretrained(self.vision_tower_name)
+        self.vision_tower = CLIPVisionModel.from_pretrained(self.vision_tower_name, device_map=device_map)
         self.vision_tower.requires_grad_(False)
 
         self.is_loaded = True
@@ -40,14 +44,6 @@ class CLIPVisionTower(nn.Module):
 
     @torch.no_grad()
     def forward(self, images):
-        
-        # Very Important for TorchXLA
-        #self.vision_tower.vision_model.encoder.gradient_checkpointing = False
-        
-        from torch_xla.utils.checkpoint import checkpoint
-        self.vision_tower.vision_model.encoder._gradient_checkpointing_func = checkpoint 
-        
-
         if type(images) is list:
             image_features = []
             for image in images:
@@ -55,9 +51,8 @@ class CLIPVisionTower(nn.Module):
                 image_feature = self.feature_select(image_forward_out).to(image.dtype)
                 image_features.append(image_feature)
         else:
-            with torch.no_grad():
-                image_forward_outs = self.vision_tower(images.to(device=self.device, dtype=self.dtype), output_hidden_states=True)
-                image_features = self.feature_select(image_forward_outs).to(images.dtype)
+            image_forward_outs = self.vision_tower(images.to(device=self.device, dtype=self.dtype), output_hidden_states=True)
+            image_features = self.feature_select(image_forward_outs).to(images.dtype)
 
         return image_features
 
