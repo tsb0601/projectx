@@ -8,6 +8,8 @@ class CLIPVisionTower(nn.Module):
     def __init__(self, vision_tower, args, delay_load=False):
         super().__init__()
 
+        
+
         self.is_loaded = False
 
         self.vision_tower_name = vision_tower
@@ -44,6 +46,12 @@ class CLIPVisionTower(nn.Module):
 
     @torch.no_grad()
     def forward(self, images):
+        
+        from torch_xla.utils.checkpoint import checkpoint
+        self.vision_tower.vision_model.encoder._gradient_checkpointing_func = checkpoint 
+        
+        
+        
         if type(images) is list:
             image_features = []
             for image in images:
