@@ -902,8 +902,8 @@ def train(INDEX, attn_implementation=None):
 	model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 	#print(model_args, data_args, training_args)
 	local_rank = training_args.local_rank
-	compute_dtype = (torch.float16 if training_args.fp16 else (torch.bfloat16 if training_args.bf16 else torch.float32))
-	#compute_dtype = torch.float32
+	#compute_dtype = (torch.float16 if training_args.fp16 else (torch.bfloat16 if training_args.bf16 else torch.float32))
+	compute_dtype = torch.float32
 
 	# Forward
 	def forward(self, hidden_states):
@@ -957,7 +957,7 @@ def train(INDEX, attn_implementation=None):
 			model = LlavaLlamaForCausalLM.from_pretrained(
 				model_args.model_name_or_path,
 				cache_dir=training_args.cache_dir,
-				torch_dtype=None,
+				torch_dtype=compute_dtype,
 				**bnb_model_from_pretrained_args
 			)
 	else:
@@ -1045,7 +1045,7 @@ def train(INDEX, attn_implementation=None):
 		
 		vision_tower = model.get_vision_tower()
 		#vision_tower.to(dtype=torch.bfloat16 if training_args.bf16 else torch.float16, device=training_args.device)
-		vision_tower.to(dtype=torch.bfloat16, device=training_args.device)
+		vision_tower.to(dtype=compute_dtype, device=training_args.device)
 
 		data_args.image_processor = vision_tower.image_processor
 		data_args.is_multimodal = True
