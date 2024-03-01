@@ -763,14 +763,14 @@ def prepare_multimodal_data(input_ids, labels, attention_mask, image_token_len=5
 		index = 0
 		for i in range(len(image_token_indices) - 1):
 			# still keep the first image token in input_ids for further use
-			cur_input_ids_im_replaced.append(cur_input_ids[image_token_indices[i]+1:image_token_indices[i+1]+1])
+			cur_input_ids_im_replaced.append(cur_input_ids[image_token_indices[i]+1:image_token_indices[i+1]])
 			cur_labels_im_replaced.append(cur_labels[image_token_indices[i]+1:image_token_indices[i+1]])
 			cur_attention_mask_im_replaced.append(cur_attention_mask[image_token_indices[i]+1:image_token_indices[i+1]])
 			cur_position_ids_im_replaced.append(torch.arange(index, index+image_token_indices[i+1]-(image_token_indices[i]+1), dtype=torch.long, device=cur_input_ids.device))
 			index += image_token_indices[i+1]-(image_token_indices[i]+1)
 			
 			if i < len(image_token_indices) - 2:
-				cur_input_ids_im_replaced.append(torch.full((image_token_len-1,), 0, device=cur_input_ids.device, dtype=cur_input_ids.dtype))
+				cur_input_ids_im_replaced.append(torch.full((image_token_len,), 0, device=cur_input_ids.device, dtype=cur_input_ids.dtype))
 				cur_labels_im_replaced.append(torch.full((image_token_len,), IGNORE_INDEX, device=cur_labels.device, dtype=cur_labels.dtype))
 				if cur_attention_mask[image_token_indices[i+1]]:	
 					cur_attention_mask_im_replaced.append(torch.full((image_token_len,), 1, device=cur_attention_mask.device, dtype=cur_attention_mask.dtype))
@@ -902,8 +902,8 @@ def train(INDEX, attn_implementation=None):
 	model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 	#print(model_args, data_args, training_args)
 	local_rank = training_args.local_rank
-	#compute_dtype = (torch.float16 if training_args.fp16 else (torch.bfloat16 if training_args.bf16 else torch.float32))
-	compute_dtype = torch.float32
+	compute_dtype = (torch.float16 if training_args.fp16 else (torch.bfloat16 if training_args.bf16 else torch.float32))
+	#compute_dtype = torch.float32
 
 	# Forward
 	def forward(self, hidden_states):
@@ -957,7 +957,7 @@ def train(INDEX, attn_implementation=None):
 			model = LlavaLlamaForCausalLM.from_pretrained(
 				model_args.model_name_or_path,
 				cache_dir=training_args.cache_dir,
-				torch_dtype=compute_dtype,
+				torch_dtype=None,
 				**bnb_model_from_pretrained_args
 			)
 	else:
@@ -1045,7 +1045,7 @@ def train(INDEX, attn_implementation=None):
 		
 		vision_tower = model.get_vision_tower()
 		#vision_tower.to(dtype=torch.bfloat16 if training_args.bf16 else torch.float16, device=training_args.device)
-		vision_tower.to(dtype=compute_dtype, device=training_args.device)
+		vision_tower.to(dtype=torch.bfloat16, device=training_args.device)
 
 		data_args.image_processor = vision_tower.image_processor
 		data_args.is_multimodal = True
