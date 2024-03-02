@@ -10,7 +10,7 @@ python llava/train/train_tpu.py \
     --mm_use_im_start_end False \
     --mm_use_im_patch_token False \
     --bf16 False \
-    --output_dir ./checkpoints/llava-v1.5-13b-float32-lr5e-6 \
+    --output_dir ./checkpoints/llava-v1.5-13b-float32-lr3e-6 \
     --num_train_epochs 1 \
     --per_device_train_batch_size 2 \
     --group_by_modality_length True \
@@ -20,7 +20,7 @@ python llava/train/train_tpu.py \
     --save_strategy "steps" \
     --save_steps 100 \
     --save_total_limit 1 \
-    --learning_rate 5e-6 \
+    --learning_rate 3e-6 \
     --weight_decay 0. \
     --warmup_ratio 0.03 \
     --lr_scheduler_type "cosine" \
