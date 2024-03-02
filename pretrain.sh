@@ -11,7 +11,7 @@ python llava/train/train_tpu.py \
     --mm_vision_select_layer -2 \
     --mm_use_im_start_end False \
     --mm_use_im_patch_token False \
-    --bf16 True \
+    --bf16 False \
     --output_dir ./checkpoints/llava-v1.5-7b-stageI \
     --num_train_epochs 1 \
     --per_device_train_batch_size 2\
@@ -31,3 +31,4 @@ python llava/train/train_tpu.py \
     --gradient_checkpointing True \
     --dataloader_num_workers 4 \
     --lazy_preprocess True \
+  
