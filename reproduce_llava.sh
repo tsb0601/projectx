@@ -2,15 +2,15 @@
 python llava/train/train_tpu.py \
     --model_name_or_path lmsys/vicuna-7b-v1.5 \
     --version v1 \
-    --data_path /mnt/disks/storage/data/finetune_data/665k.json \
-    --image_folder /mnt/disks/storage/data/finetune_data \
+    --data_path merged_llava.json \
+    --image_folder /mnt/disks/storage/data \
     --vision_tower openai/clip-vit-large-patch14-336 \
     --mm_projector_type mlp2x_gelu \
     --mm_vision_select_layer -2 \
     --mm_use_im_start_end False \
     --mm_use_im_patch_token False \
-    --bf16 True \
-    --output_dir ./checkpoints/llava-v1.5-13b-bs2 \
+    --bf16 False \
+    --output_dir ./checkpoints/llava-v1.5-13b-float32 \
     --num_train_epochs 1 \
     --per_device_train_batch_size 2 \
     --group_by_modality_length True \
