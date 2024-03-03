@@ -249,36 +249,7 @@ class LLaVATrainer(Trainer):
             super(LLaVATrainer, self)._save_checkpoint(model, trial, metrics)
 
     def _save(self, output_dir: Optional[str] = None, state_dict=None):
-        import torch_xla.core.xla_model as xm
-        from torch_xla.distributed.fsdp import consolidate_sharded_model_checkpoints
-        ckpt_prefix = "/tmp/model-fsdp/model_ckpt"
-        ckpt_prefix = os.path.join(output_dir, "model_ckpt")
-        output_dir = output_dir if output_dir is not None else self.args.output_dir
-        os.makedirs(output_dir, exist_ok=True)
-        rank = xm.get_ordinal()
-        print(rank)
-        world_size = xm.xrt_world_size()
-        ckpt_path = f'{ckpt_prefix}_rank-{rank:08d}-of-{world_size:08d}.pth'
-        state_dict = self.model.state_dict()
-        cpu_state_dict = {
-        		key: value.cpu()
-        		for key, value in state_dict.items()
-        	}
-        del state_dict
-        ckpt = {
-            'model': cpu_state_dict,
-            'shard_metadata': self.model.get_shard_metadata()
-        }
-        os.makedirs(os.path.dirname(ckpt_path), exist_ok=True)
-        xm.save(ckpt, ckpt_path, master_only=False)
-        print(f'checkpoint saved to {ckpt_path}\n', end='')
-        if xm.is_master_ordinal(local=False):
-            # consolidate_sharded_model_checkpoints(
-            #     ckpt_prefix=ckpt_prefix, ckpt_suffix="_rank-*-of-*.pth", save_path = os.path.join(output_dir, "model_consolidated.pth"))
-            # self.model.save_pretrained(output_dir, state_dict=None, safe_serialization=self.args.save_safetensors)
-            if self.tokenizer is not None:
-                self.tokenizer.save_pretrained(output_dir)
-            TRAINING_ARGS_NAME = "training_args.bin"
-            # Good practice: save your training arguments together with the trained model
-            torch.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
-
+        if getattr(self.args, 'tune_mm_mlp_adapter', False):
+            pass
+        else:
+            super(LLaVATrainer, self)._save(output_dir, state_dict)

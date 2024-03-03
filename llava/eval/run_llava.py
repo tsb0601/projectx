@@ -15,6 +15,7 @@ from llava.mm_utils import (
     process_images,
     tokenizer_image_token,
     get_model_name_from_path,
+    KeywordsStoppingCriteria,
 )
 
 from PIL import Image
@@ -71,10 +72,6 @@ def eval_model(args):
 
     if "llama-2" in model_name.lower():
         conv_mode = "llava_llama_2"
-    elif "mistral" in model_name.lower():
-        conv_mode = "mistral_instruct"
-    elif "v1.6-34b" in model_name.lower():
-        conv_mode = "chatml_direct"
     elif "v1" in model_name.lower():
         conv_mode = "llava_v1"
     elif "mpt" in model_name.lower():
@@ -98,7 +95,6 @@ def eval_model(args):
 
     image_files = image_parser(args)
     images = load_images(image_files)
-    image_sizes = [x.size for x in images]
     images_tensor = process_images(
         images,
         image_processor,
@@ -111,20 +107,36 @@ def eval_model(args):
         .cuda()
     )
 
+    stop_str = conv.sep if conv.sep_style != SeparatorStyle.TWO else conv.sep2
+    keywords = [stop_str]
+    stopping_criteria = KeywordsStoppingCriteria(keywords, tokenizer, input_ids)
+
     with torch.inference_mode():
         output_ids = model.generate(
             input_ids,
             images=images_tensor,
-            image_sizes=image_sizes,
             do_sample=True if args.temperature > 0 else False,
             temperature=args.temperature,
             top_p=args.top_p,
             num_beams=args.num_beams,
             max_new_tokens=args.max_new_tokens,
             use_cache=True,
+            stopping_criteria=[stopping_criteria],
         )
 
-    outputs = tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0].strip()
+    input_token_len = input_ids.shape[1]
+    n_diff_input_output = (input_ids != output_ids[:, :input_token_len]).sum().item()
+    if n_diff_input_output > 0:
+        print(
+            f"[Warning] {n_diff_input_output} output_ids are not the same as the input_ids"
+        )
+    outputs = tokenizer.batch_decode(
+        output_ids[:, input_token_len:], skip_special_tokens=True
+    )[0]
+    outputs = outputs.strip()
+    if outputs.endswith(stop_str):
+        outputs = outputs[: -len(stop_str)]
+    outputs = outputs.strip()
     print(outputs)
 
 

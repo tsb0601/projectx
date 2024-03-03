@@ -79,7 +79,7 @@ class ModelWorker:
         if not no_register:
             self.register_to_controller()
             self.heart_beat_thread = threading.Thread(
-                target=heart_beat_worker, args=(self,), daemon=True)
+                target=heart_beat_worker, args=(self,))
             self.heart_beat_thread.start()
 
     def register_to_controller(self):

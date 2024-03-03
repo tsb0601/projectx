@@ -23,7 +23,6 @@ import pathlib
 from typing import Dict, Optional, Sequence, List
 
 import torch
-from torch import nn
 
 import transformers
 import tokenizers
@@ -37,6 +36,20 @@ from llava.model import *
 from llava.mm_utils import tokenizer_image_token
 
 from PIL import Image
+
+import torch_xla
+import torch_xla.debug.profiler as xp
+import torch_xla.runtime as xr
+
+
+import wandb
+
+# Replace 'your_api_key' with your actual Weights & Biases API key
+wandb.login(key='2a145ed60d7ab35681e5a8ff31ea85624f239889')
+
+# Enable SPMD mode execution
+xr.use_spmd()
+
 
 
 local_rank = None
@@ -306,7 +319,6 @@ def _add_speaker_and_signal(header, source, get_conversation=True):
     return conversation
 
 
-
 def preprocess_multimodal(
     sources: Sequence[str],
     data_args: DataArguments
@@ -315,20 +327,20 @@ def preprocess_multimodal(
     if not is_multimodal:
         return sources
 
-    #print("before processing:", sources)
     for source in sources:
         for sentence in source:
             if DEFAULT_IMAGE_TOKEN in sentence['value']:
-                sentence['value'] = sentence['value'].replace(DEFAULT_IMAGE_TOKEN, '<Image>' + DEFAULT_IMAGE_TOKEN + '</Image>').strip()
-            # replace_token = DEFAULT_IMAGE_TOKEN
-            # if data_args.mm_use_im_start_end:
-            #     replace_token = DEFAULT_IM_START_TOKEN + replace_token + DEFAULT_IM_END_TOKEN
-            # sentence["value"] = sentence["value"].replace(DEFAULT_IMAGE_TOKEN, replace_token)
+                sentence['value'] = sentence['value'].replace(DEFAULT_IMAGE_TOKEN, '').strip()
+                sentence['value'] = DEFAULT_IMAGE_TOKEN + '\n' + sentence['value']
+                sentence['value'] = sentence['value'].strip()
+                if "mmtag" in conversation_lib.default_conversation.version:
+                    sentence['value'] = sentence['value'].replace(DEFAULT_IMAGE_TOKEN, '<Image>' + DEFAULT_IMAGE_TOKEN + '</Image>')
+            replace_token = DEFAULT_IMAGE_TOKEN
+            if data_args.mm_use_im_start_end:
+                replace_token = DEFAULT_IM_START_TOKEN + replace_token + DEFAULT_IM_END_TOKEN
+            sentence["value"] = sentence["value"].replace(DEFAULT_IMAGE_TOKEN, replace_token)
 
-    
-    #print("after processing:", sources)
     return sources
-
 
 
 def preprocess_llama_2(
@@ -492,7 +504,6 @@ def preprocess_v1(
                     f"WARNING: tokenization mismatch: {cur_len} vs. {total_len}."
                     f" (ignored)"
                 )
-    #print(conversations, input_ids, targets)
 
     return dict(
         input_ids=input_ids,
@@ -697,30 +708,28 @@ class LazySupervisedDataset(Dataset):
         if isinstance(i, int):
             sources = [sources]
         assert len(sources) == 1, "Don't know why it is wrapped to a list"  # FIXME
-
         if 'image' in sources[0]:
             image_file = self.list_data_dict[i]['image']
-            
-            #(image_file)
-
-            if not isinstance(image_file, list):
-                image_file = [image_file]
-            #print(image_file)
-
             image_folder = self.data_args.image_folder
-            processor = self.data_args.image_processor            
-            processed_images = []
-            for img_file in image_file:  # Iterate over each image filename in the list
-                # Open and convert each image
-                image = Image.open(os.path.join(image_folder, img_file)).convert('RGB')
-                if self.data_args.image_aspect_ratio == 'pad':
-                    # Apply padding to make the image square if necessary
-                    image = expand2square(image, tuple(int(x*255) for x in processor.image_mean))
-                # Preprocess the (potentially padded) image and extract pixel values
-                processed_image = processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
-                # Add the processed image to the list
-                processed_images.append(processed_image)
-            
+            processor = self.data_args.image_processor
+            image = Image.open(os.path.join(image_folder, image_file)).convert('RGB')
+            if self.data_args.image_aspect_ratio == 'pad':
+                def expand2square(pil_img, background_color):
+                    width, height = pil_img.size
+                    if width == height:
+                        return pil_img
+                    elif width > height:
+                        result = Image.new(pil_img.mode, (width, width), background_color)
+                        result.paste(pil_img, (0, (width - height) // 2))
+                        return result
+                    else:
+                        result = Image.new(pil_img.mode, (height, height), background_color)
+                        result.paste(pil_img, ((height - width) // 2, 0))
+                        return result
+                image = expand2square(image, tuple(int(x*255) for x in processor.image_mean))
+                image = processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
+            else:
+                image = processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
             sources = preprocess_multimodal(
                 copy.deepcopy([e["conversations"] for e in sources]),
                 self.data_args)
@@ -736,8 +745,11 @@ class LazySupervisedDataset(Dataset):
 
         # image exist in the data
         if 'image' in self.list_data_dict[i]:
-            data_dict['image'] = processed_images
-       
+            data_dict['image'] = image
+        elif self.data_args.is_multimodal:
+            # image does not exist in the data, but the model is multimodal
+            crop_size = self.data_args.image_processor.crop_size
+            data_dict['image'] = torch.zeros(3, crop_size['height'], crop_size['width'])
         return data_dict
 
 
@@ -765,16 +777,13 @@ class DataCollatorForSupervisedDataset(object):
             attention_mask=input_ids.ne(self.tokenizer.pad_token_id),
         )
 
-        #if 'image' in instances[0]:
-            # images = [instance['image'] for instance in instances]
-            # if all(x is not None and x.shape == images[0].shape for x in images):
-            #     batch['images'] = torch.stack(images)
-            # else:
-            #     batch['images'] = images、
-            #print(instances[0],instances[1], len(instances))
-        images = [instance['image'] for instance in instances if 'image' in instance]
-        batch['images'] = images
-        
+        if 'image' in instances[0]:
+            images = [instance['image'] for instance in instances]
+            if all(x is not None and x.shape == images[0].shape for x in images):
+                batch['images'] = torch.stack(images)
+            else:
+                batch['images'] = images
+
         return batch
 
 
@@ -790,28 +799,7 @@ def make_supervised_data_module(tokenizer: transformers.PreTrainedTokenizer,
                 data_collator=data_collator)
 
 
-
-def convert_to_bf16_except_llama(model):
-    # Loop through all modules and their respective parameters
-    
-    # Assuming model is your PyTorch model
-    for name, param in model.named_parameters():
-        # Check if 'model.layers' is not in the parameter name
-        if 'model.layers' not in name:
-            # Convert parameter to bfloat16
-            param.data = param.data.to(torch.bfloat16)
-            # if param.requires_grad:
-            #     # Also convert the grad attribute if it exists
-            #     param.grad = param.grad.to(torch.bfloat16) if param.grad is not None else None
-            print(f"{name} this is converted")
-
-        else:
-            print(f"{name} this is not converted")
-
-
-
-
-def train(INDEX, attn_implementation=None):
+def train(attn_implementation=None):
 #def train(attn_implementation=None):
 
     global local_rank
@@ -824,22 +812,6 @@ def train(INDEX, attn_implementation=None):
     local_rank = training_args.local_rank
     compute_dtype = (torch.float16 if training_args.fp16 else (torch.bfloat16 if training_args.bf16 else torch.float32))
     #compute_dtype = torch.float32
-
-    # Forward
-    def forward(self, hidden_states):
-        input_dtype = hidden_states.dtype
-        #print("input dtype is:", input_dtype)
-        hidden_states = hidden_states.to(torch.float32)
-        variance = hidden_states.pow(2).mean(-1, keepdim=True)
-        hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
-        output = (self.weight * hidden_states).to(input_dtype)
-        #print("output dtype is", output.dtype)
-        return output
-
-    transformers.models.llama.modeling_llama.LlamaRMSNorm.forward = forward
-
-
-
 
     bnb_model_from_pretrained_args = {}
     if training_args.bits in [4, 8]:
@@ -860,9 +832,6 @@ def train(INDEX, attn_implementation=None):
             )
         ))
 
-    
-    
-
     if model_args.vision_tower is not None:
         if 'mpt' in model_args.model_name_or_path:
             config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
@@ -874,12 +843,11 @@ def train(INDEX, attn_implementation=None):
                 **bnb_model_from_pretrained_args
             )
         else:
-            
             model = LlavaLlamaForCausalLM.from_pretrained(
                 model_args.model_name_or_path,
                 cache_dir=training_args.cache_dir,
-                torch_dtype=None,
-                do_sample=True,
+                attn_implementation=attn_implementation,
+                torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
                 **bnb_model_from_pretrained_args
             )
     else:
@@ -890,7 +858,6 @@ def train(INDEX, attn_implementation=None):
             torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
             **bnb_model_from_pretrained_args
         )
-
     model.config.use_cache = False
 
     if model_args.freeze_backbone:
@@ -901,13 +868,13 @@ def train(INDEX, attn_implementation=None):
         model.config.torch_dtype=(torch.float32 if training_args.fp16 else (torch.bfloat16 if training_args.bf16 else torch.float32))
         model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=training_args.gradient_checkpointing)
 
-    # if training_args.gradient_checkpointing:
-    #     if hasattr(model, "enable_input_require_grads"):
-    #         model.enable_input_require_grads()
-    #     else:
-    #         def make_inputs_require_grad(module, input, output):
-    #             output.requires_grad_(True)
-    #         model.get_input_embeddings().register_forward_hook(make_inputs_require_grad)
+    if training_args.gradient_checkpointing:
+        if hasattr(model, "enable_input_require_grads"):
+            model.enable_input_require_grads()
+        else:
+            def make_inputs_require_grad(module, input, output):
+                output.requires_grad_(True)
+            model.get_input_embeddings().register_forward_hook(make_inputs_require_grad)
 
     if training_args.lora_enable:
         from peft import LoraConfig, get_peft_model
@@ -966,8 +933,7 @@ def train(INDEX, attn_implementation=None):
         )
         
         vision_tower = model.get_vision_tower()
-        #vision_tower.to(dtype=torch.bfloat16 if training_args.bf16 else torch.float16, device=training_args.device)
-        vision_tower.to(dtype=torch.bfloat16, device=training_args.device)
+        vision_tower.to(dtype=torch.bfloat16 if training_args.bf16 else torch.float16, device=training_args.device)
 
         data_args.image_processor = vision_tower.image_processor
         data_args.is_multimodal = True
@@ -990,7 +956,6 @@ def train(INDEX, attn_implementation=None):
         if training_args.bits in [4, 8]:
             model.get_model().mm_projector.to(dtype=compute_dtype, device=training_args.device)
 
-        
         model.config.mm_use_im_start_end = data_args.mm_use_im_start_end = model_args.mm_use_im_start_end
         model.config.mm_projector_lr = training_args.mm_projector_lr
         training_args.use_im_start_end = model_args.mm_use_im_start_end
@@ -1014,41 +979,62 @@ def train(INDEX, attn_implementation=None):
                                               data_args=data_args)
 
 
-    ### Implement FSDP
+    ### Implement SPMD
+
+    
 
 
-    # import torch_xla.core.xla_model as xm
-    # from pprint import pprint
-    # from torch_xla.distributed.fsdp import XlaFullyShardedDataParallel as FSDP, checkpoint_module
-    # fsdp_wrap = lambda m: FSDP(m, compute_dtype=torch.bfloat16, shard_param_on_dim_0=True, pin_layout_in_collective_ops=True)
-    # import inspect
-    # forward_signature = inspect.signature(model.forward.__func__)
-    # model = model.to(torch.float32)
-    # model = fsdp_wrap(model)
-    # model.forward.__func__.__signature__ = forward_signature
+    import torch_xla.core.xla_model as xm
+    import torch_xla.experimental.xla_sharding as xs
 
-    # # Patch `xm.optimizer_step` not to reduce gradients in this case,
-    # # as FSDP does not need gradient reduction over sharded parameters.
-    # # Note: this ultimately should be something to be implemented in the Hugging Face trainer
-    # # to directly call `optimizer.step()` when the model is an FSDP instance,
-    # # but we chose to patch it here to get a standalone example without changing the Hugging Face trainer
-    # def patched_optimizer_step(optimizer, barrier=False, optimizer_args={}):
-    #     loss = optimizer.step(**optimizer_args)
-    #     if barrier:
-    #         xm.mark_step()
-    #     return loss
-
-    # xm.optimizer_step = patched_optimizer_step
+    # Replace the linear layer
+    from torch_xla.distributed.fsdp.utils import apply_xla_patch_to_nn_linear
+    model = apply_xla_patch_to_nn_linear(model, xs.xla_patched_nn_linear_forward)
 
 
-    #convert_to_bf16_except_llama(model)
+    model = model.to(xm.xla_device(), dtype=torch.bfloat16)
 
+
+
+
+    spmd_2d_sharding = 1
+    spmd_dcn_parallelism = 1
+
+    # Place DCN on an independent axis in the mesh. Model parameters should be
+    # replicated along the DCN axis, and inputs and activations should have
+    # the batch dimension sharded along the combined DCN and data axes.
+    num_devices = xr.global_runtime_device_count()
+    
+    print(f"number of devices:{num_devices}")
+
+    model_axis = max(spmd_2d_sharding, 1)
+    dcn_axis = spmd_dcn_parallelism
+    data_axis = num_devices // model_axis // dcn_axis
+    ici_mesh_shape = (1, data_axis, model_axis)
+    dcn_mesh_shape = (dcn_axis, 1, 1)
+    spmd_mesh = xs.HybridMesh(ici_mesh_shape=ici_mesh_shape,
+                              dcn_mesh_shape=dcn_mesh_shape,
+                              axis_names=('dcn', 'fsdp', 'model'))
+
+    from torch_xla.experimental.spmd_fully_sharded_data_parallel import SpmdFullyShardedDataParallel as FSDPv2
+    def shard_output(output, mesh):
+        xs.mark_sharding(output.logits, mesh, ('fsdp', None, None))
+    model = FSDPv2(model, spmd_mesh, shard_output)
+
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+=======
+ 
+
+>>>>>>> 367dc5a6665b2a568fb144a856fac396e4280326
+>>>>>>> 8792dfb74613dcb89e6f6b9bf4b9eb5d4a29fbad
+    
 
     trainer = LLaVATrainer(model=model,
                     tokenizer=tokenizer,
                     args=training_args,
                     **data_module)
-    
 
     if list(pathlib.Path(training_args.output_dir).glob("checkpoint-*")):
         trainer.train(resume_from_checkpoint=True)
@@ -1073,6 +1059,9 @@ def train(INDEX, attn_implementation=None):
         safe_save_model_for_hf_trainer(trainer=trainer,
                                        output_dir=training_args.output_dir)
 
+def _mp_fn(index):
+    # For xla_spawn (TPUs)
+    train()
 
 if __name__ == "__main__":
     train()
