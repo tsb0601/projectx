@@ -4,7 +4,7 @@ python llava/train/train_tpu.py \
     --model_name_or_path lmsys/vicuna-7b-v1.5 \
     --version v1 \
     --data_path 4528k.json \
-    --image_folder /mnt/disks/storage/finetune_data \
+    --image_folder /mnt/disks/storage/data/finetune_data \
     --vision_tower openai/clip-vit-large-patch14-336 \
     --mm_projector_type mlp2x_gelu \
     --mm_vision_select_layer -2 \
