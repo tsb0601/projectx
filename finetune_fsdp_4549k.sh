@@ -1,6 +1,6 @@
 #!/bin/bash
 
-python llava/train/train_tpu.py \
+/mnt/disks/storage/envs/anaconda3/bin/python llava/train/train_tpu.py \
     --model_name_or_path lmsys/vicuna-7b-v1.5 \
     --version v1 \
     --data_path /mnt/disks/storage/data/finetune_data/4549k.json \
