@@ -30,6 +30,33 @@ import torch_xla
 #from llava.train.train import train
 from llava.train.train_fsdp import train
 
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from transformers.models.llama.tokenization_llama import LlamaTokenizer
+import types
+
+# SPIECE_UNDERLINE = "▁"
+# def tokenize(self, text: "TextInput", add_special_tokens=False, **kwargs) -> List[str]:
+#     """
+#     Converts a string to a list of tokens. If `self.legacy` is set to `False`, a prefix token is added unless the
+#     first token is special.
+#     """
+#     if self.legacy or len(text) == 0:
+#         return super(LlamaTokenizer, self).tokenize(text, **kwargs)
+
+#     text = text.replace(SPIECE_UNDERLINE, " ")
+#     if self.add_prefix_space:
+#         text = SPIECE_UNDERLINE + text
+
+#     tokens = super(LlamaTokenizer, self).tokenize(text, **kwargs)
+
+#     if len(tokens) > 1 and tokens[0] == SPIECE_UNDERLINE and tokens[1] in self.all_special_tokens:
+#         tokens = tokens[1:]
+#     return tokens
+# LlamaTokenizer.tokenize = tokenize
+
+# import wandb
+# wandb.login(key='618eb3b78242f01000855a123d29e2ac98a60f30')
+
 if __name__ == "__main__":
     #train()
     import multiprocessing as mp

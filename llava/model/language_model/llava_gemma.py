@@ -19,7 +19,7 @@ import torch
 import torch.nn as nn
 import torch_xla
 from transformers import AutoConfig, AutoModelForCausalLM, \
-                         LlamaConfig, LlamaModel, LlamaForCausalLM
+                         GemmaConfig, GemmaModel, GemmaForCausalLM
 
 from transformers.modeling_outputs import CausalLMOutputWithPast
 from transformers.generation.utils import GenerateOutput
@@ -27,29 +27,29 @@ from transformers.generation.utils import GenerateOutput
 from ..llava_arch import LlavaMetaModel, LlavaMetaForCausalLM
 
 
-class LlavaConfig(LlamaConfig):
-    model_type = "llava_llama"
+class LlavaConfig(GemmaConfig):
+    model_type = "llava_gemma"
 
     debug = "debug"
 
 
-class LlavaLlamaModel(LlavaMetaModel, LlamaModel):
+class LlavaGemmaModel(LlavaMetaModel, GemmaModel):
     config_class = LlavaConfig
 
-    def __init__(self, config: LlamaConfig):
-        super(LlavaLlamaModel, self).__init__(config)
+    def __init__(self, config: GemmaConfig):
+        super(LlavaGemmaModel, self).__init__(config)
 
 
-class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
+class LlavaGemmaForCausalLM(GemmaForCausalLM, LlavaMetaForCausalLM):
     config_class = LlavaConfig
 
     def __init__(self, config, spmd_debug=None, spmd_mesh=None, spmd_fsdp_sharding=None):
-        super(LlamaForCausalLM, self).__init__(config)
+        super(GemmaForCausalLM, self).__init__(config)
         
         config.spmd_debug = spmd_debug
         config.spmd_mesh = spmd_mesh
         config.spmd_fsdp_sharding = spmd_fsdp_sharding
-        self.model = LlavaLlamaModel(config)
+        self.model = LlavaGemmaModel(config)
         self.pretraining_tp = config.pretraining_tp
         self.vocab_size = config.vocab_size
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
@@ -174,5 +174,5 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
             inputs['image_sizes'] = image_sizes
         return inputs
 
-AutoConfig.register("llava_llama", LlavaConfig)
-AutoModelForCausalLM.register(LlavaConfig, LlavaLlamaForCausalLM)
+AutoConfig.register("llava_gemma", LlavaConfig)
+AutoModelForCausalLM.register(LlavaConfig, LlavaGemmaForCausalLM)

@@ -10,6 +10,7 @@ class SeparatorStyle(Enum):
     MPT = auto()
     PLAIN = auto()
     LLAMA_2 = auto()
+    GEMMA = auto()
 
 
 @dataclasses.dataclass
@@ -98,6 +99,15 @@ class Conversation:
                     ret += message + seps[i % 2]
                 else:
                     ret += ""
+        elif self.sep_style == SeparatorStyle.GEMMA:
+            ret = self.system + self.sep
+            for role, message in messages:
+                if message:
+                    if type(message) is tuple:
+                        message, _, _ = message
+                    ret += role + message + self.sep
+                else:
+                    ret += role
         else:
             raise ValueError(f"Invalid style: {self.sep_style}")
 
@@ -298,6 +308,16 @@ A conversation between a user and an LLM-based AI assistant. The assistant gives
     sep="<|im_end|>",
 )
 
+conv_gemma = Conversation(
+    system="""""",
+    roles=("<start_of_turn>user\n", "<start_of_turn>model\n"),
+    version="gemma",
+    messages=(),
+    offset=0,
+    sep_style=SeparatorStyle.GEMMA,
+    sep="<end_of_turn>\n",
+)
+
 conv_llava_plain = Conversation(
     system="",
     roles=("", ""),
@@ -399,6 +419,8 @@ conv_templates = {
     "llava_llama_2": conv_llava_llama_2,
 
     "mpt": conv_mpt,
+
+    "conv_gemma": conv_gemma
 }
 
 
