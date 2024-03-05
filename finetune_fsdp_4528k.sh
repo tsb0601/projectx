@@ -1,7 +1,7 @@
 #!/bin/bash
 
 python llava/train/train_tpu.py \
-    --model_name_or_path lmsys/vicuna-7b-v1.5 \
+    --model_name_or_path lmsys/vicuna-13b-v1.5 \
     --version v1 \
     --data_path /mnt/disks/storage/data/finetune_data/4528k.json \
     --image_folder /mnt/disks/storage/data/finetune_data \
@@ -13,7 +13,7 @@ python llava/train/train_tpu.py \
     --image_aspect_ratio pad \
     --group_by_modality_length True \
     --bf16 False \
-    --output_dir ./checkpoints/llava-v1.5-7b-finetune-4528k \
+    --output_dir ./checkpoints/llava-v1.5-13b-finetune-4528k \
     --num_train_epochs 1 \
     --per_device_train_batch_size 4 \
     --per_device_eval_batch_size 4 \
