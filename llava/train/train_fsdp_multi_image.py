@@ -791,26 +791,58 @@ class LazySupervisedDataset(Dataset):
 		assert len(sources) == 1, "Don't know why it is wrapped to a list"  # FIXME
 		if 'image' in sources[0]:
 			image_file = self.list_data_dict[i]['image']
+        
+			if not isinstance(image_file, list):
+				image_file = [image_file]
+
 			image_folder = self.data_args.image_folder
-			processor = self.data_args.image_processor
-			image = Image.open(os.path.join(image_folder, image_file)).convert('RGB')
-			if self.data_args.image_aspect_ratio == 'pad':
-				def expand2square(pil_img, background_color):
-					width, height = pil_img.size
-					if width == height:
-						return pil_img
-					elif width > height:
-						result = Image.new(pil_img.mode, (width, width), background_color)
-						result.paste(pil_img, (0, (width - height) // 2))
-						return result
-					else:
-						result = Image.new(pil_img.mode, (height, height), background_color)
-						result.paste(pil_img, ((height - width) // 2, 0))
-						return result
-				image = expand2square(image, tuple(int(x*255) for x in processor.image_mean))
-				image = processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
-			else:
-				image = processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
+			processor = self.data_args.image_processor            
+			processed_images = []
+			for img_file in image_file:  # Iterate over each image filename in the list
+                # Open and convert each image
+				image = Image.open(os.path.join(image_folder, img_file)).convert('RGB')
+				if self.data_args.image_aspect_ratio == 'pad':
+                    # Apply padding to make the image square if necessary
+					def expand2square(pil_img, background_color):
+						width, height = pil_img.size
+						if width == height:
+							return pil_img
+						elif width > height:
+							result = Image.new(pil_img.mode, (width, width), background_color)
+							result.paste(pil_img, (0, (width - height) // 2))
+							return result
+						else:
+							result = Image.new(pil_img.mode, (height, height), background_color)
+							result.paste(pil_img, ((height - width) // 2, 0))
+							return result
+					image = expand2square(image, tuple(int(x*255) for x in processor.image_mean))
+                # Preprocess the (potentially padded) image and extract pixel values
+				processed_image = processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
+                # Add the processed image to the list
+				processed_images.append(processed_image)
+
+			# #image_file = self.list_data_dict[i]['image']
+			# image_folder = self.data_args.image_folder
+			# processor = self.data_args.image_processor
+			# image = Image.open(os.path.join(image_folder, image_file)).convert('RGB')
+			# if self.data_args.image_aspect_ratio == 'pad':
+			# 	def expand2square(pil_img, background_color):
+			# 		width, height = pil_img.size
+			# 		if width == height:
+			# 			return pil_img
+			# 		elif width > height:
+			# 			result = Image.new(pil_img.mode, (width, width), background_color)
+			# 			result.paste(pil_img, (0, (width - height) // 2))
+			# 			return result
+			# 		else:
+			# 			result = Image.new(pil_img.mode, (height, height), background_color)
+			# 			result.paste(pil_img, ((height - width) // 2, 0))
+			# 			return result
+			# 	image = expand2square(image, tuple(int(x*255) for x in processor.image_mean))
+			# 	image = processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
+			# else:
+			# 	image = processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
+			
 			sources = preprocess_multimodal(
 				copy.deepcopy([e["conversations"] for e in sources]),
 				self.data_args)
@@ -830,7 +862,10 @@ class LazySupervisedDataset(Dataset):
 		elif self.data_args.is_multimodal:
 			# image does not exist in the data, but the model is multimodal
 			crop_size = self.data_args.image_processor.crop_size
-			data_dict['image'] = torch.zeros(3, crop_size['height'], crop_size['width'])
+			data_dict['image'] = [torch.zeros(3, crop_size['height'], crop_size['width'])]
+		
+		# Data Dict will output image as a list of tensors
+
 		return data_dict
 
 def prepare_multimodal_data(input_ids, labels, attention_mask, image_token_len=576, max_length=2048):
