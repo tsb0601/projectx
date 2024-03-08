@@ -3,7 +3,7 @@
 python llava/train/train_tpu.py \
     --model_name_or_path lmsys/vicuna-7b-v1.5 \
     --version v1 \
-    --data_path /mnt/disks/storage/data/finetune_data/3617k.json \
+    --data_path 4521k_clean.json \
     --image_folder /mnt/disks/storage/data/finetune_data \
     --vision_tower openai/clip-vit-large-patch14-336 \
     --mm_projector_type mlp2x_gelu \
@@ -13,7 +13,7 @@ python llava/train/train_tpu.py \
     --image_aspect_ratio pad \
     --group_by_modality_length True \
     --bf16 False \
-    --output_dir ./checkpoints/llava-v1.5-7b-finetune-3617k \
+    --output_dir ./checkpoints/llava-v1.5-7b-finetune-4521k \
     --num_train_epochs 1 \
     --per_device_train_batch_size 4 \
     --per_device_eval_batch_size 4 \
