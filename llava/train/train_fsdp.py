@@ -758,14 +758,27 @@ class LazySupervisedDataset(Dataset):
 				 tokenizer: transformers.PreTrainedTokenizer,
 				 data_args: DataArguments):
 		super(LazySupervisedDataset, self).__init__()
-		list_data_dict = json.load(open(data_path, "r"))
+		#list_data_dict = json.load(open(data_path, "r"))
 		rank0_print("Formatting inputs...Skip in lazy mode")
 		self.tokenizer = tokenizer
-		self.list_data_dict = list_data_dict
+		#self.list_data_dict = list_data_dict
+		self.data_path = data_path
 		self.data_args = data_args
+		self.length = self._get_length()
+
+	def _get_length(self):
+		"""Calculates the number of samples in the .jsonl file."""
+		with open(self.data_path, 'r') as file:
+			for i, _ in enumerate(file):
+				pass
+		return i + 1
 
 	def __len__(self):
-		return len(self.list_data_dict)
+		"""Returns the number of samples in the dataset."""
+		return self.length
+
+	# def __len__(self):
+	# 	return len(self.list_data_dict)
 
 	@property
 	def lengths(self):
@@ -785,7 +798,15 @@ class LazySupervisedDataset(Dataset):
 		return length_list
 
 	def __getitem__(self, i) -> Dict[str, torch.Tensor]:
-		sources = self.list_data_dict[i]
+		#sources = self.list_data_dict[i]
+
+		with open(self.jsonl_data_path, 'r') as file:
+			for idx, line in enumerate(file):
+				if idx == i:
+					sources = json.loads(line.strip())
+					break
+
+		dat = sources
 		if isinstance(i, int):
 			sources = [sources]
 		assert len(sources) == 1, "Don't know why it is wrapped to a list"  # FIXME
@@ -819,13 +840,13 @@ class LazySupervisedDataset(Dataset):
 		data_dict = preprocess(
 			sources,
 			self.tokenizer,
-			has_image=('image' in self.list_data_dict[i]))
+			has_image=('image' in dat))
 		if isinstance(i, int):
 			data_dict = dict(input_ids=data_dict["input_ids"][0],
 							 labels=data_dict["labels"][0])
 
 		# image exist in the data
-		if 'image' in self.list_data_dict[i]:
+		if 'image' in dat:
 			data_dict['image'] = image
 		elif self.data_args.is_multimodal:
 			# image does not exist in the data, but the model is multimodal
