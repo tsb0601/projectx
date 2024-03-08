@@ -828,7 +828,7 @@ class LazySupervisedDataset(Dataset):
 	def __getitem__(self, i) -> Dict[str, torch.Tensor]:
 		#sources = self.list_data_dict[i]
 
-		with open(self.jsonl_data_path, 'r') as file:
+		with open(self.data_path, 'r') as file:
 			for idx, line in enumerate(file):
 				if idx == i:
 					sources = json.loads(line.strip())
