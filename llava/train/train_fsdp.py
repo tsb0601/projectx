@@ -780,22 +780,50 @@ class LazySupervisedDataset(Dataset):
 	# def __len__(self):
 	# 	return len(self.list_data_dict)
 
+	def _compute_lengths(self):
+		"""Compute and cache lengths of conversations in the dataset."""
+		if hasattr(self, 'length_list') and hasattr(self, 'modality_length_list'):
+			# Return cached values if already computed
+			return self.length_list, self.modality_length_list
+
+		self.length_list = []
+		self.modality_length_list = []
+		with open(self.data_path, 'r') as file:
+			for line in file:
+				sample = json.loads(line.strip())
+				img_tokens = 128 if 'image' in sample else 0
+				cur_len = sum(len(conv['value'].split()) for conv in sample['conversations'])
+				self.length_list.append(cur_len + img_tokens)
+				modality_len = cur_len if 'image' in sample else -cur_len
+				self.modality_length_list.append(modality_len)
+		return self.length_list, self.modality_length_list
+
 	@property
 	def lengths(self):
-		length_list = []
-		for sample in self.list_data_dict:
-			img_tokens = 128 if 'image' in sample else 0
-			length_list.append(sum(len(conv['value'].split()) for conv in sample['conversations']) + img_tokens)
+		length_list, _ = self._compute_lengths()
 		return length_list
 
 	@property
 	def modality_lengths(self):
-		length_list = []
-		for sample in self.list_data_dict:
-			cur_len = sum(len(conv['value'].split()) for conv in sample['conversations'])
-			cur_len = cur_len if 'image' in sample else -cur_len
-			length_list.append(cur_len)
-		return length_list
+		_, modality_length_list = self._compute_lengths()
+		return modality_length_list
+
+	# @property
+	# def lengths(self):
+	# 	length_list = []
+	# 	for sample in self.list_data_dict:
+	# 		img_tokens = 128 if 'image' in sample else 0
+	# 		length_list.append(sum(len(conv['value'].split()) for conv in sample['conversations']) + img_tokens)
+	# 	return length_list
+
+	# @property
+	# def modality_lengths(self):
+	# 	length_list = []
+	# 	for sample in self.list_data_dict:
+	# 		cur_len = sum(len(conv['value'].split()) for conv in sample['conversations'])
+	# 		cur_len = cur_len if 'image' in sample else -cur_len
+	# 		length_list.append(cur_len)
+	# 	return length_list
 
 	def __getitem__(self, i) -> Dict[str, torch.Tensor]:
 		#sources = self.list_data_dict[i]
