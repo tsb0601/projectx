@@ -5,7 +5,7 @@ python llava/train/train_tpu.py \
     --version v1 \
     --data_path /mnt/disks/storage/data/finetune_data/5358kL.jsonl \
     --image_folder /mnt/disks/storage/data/finetune_data \
-    --vision_tower apple/DFN5B-CLIP-ViT-H-14-378 \
+    --vision_tower openai/clip-vit-large-patch14-336 \
     --mm_projector_type mlp2x_gelu \
     --mm_vision_select_layer -2 \
     --mm_use_im_start_end False \
