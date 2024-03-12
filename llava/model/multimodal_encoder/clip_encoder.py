@@ -47,8 +47,6 @@ class CLIPVisionTower(nn.Module):
         if self.vision_tower_name == "apple/DFN5B-CLIP-ViT-H-14-378":
             self.open_clip = True
 
-            self.image_processor = CLIPImageProcessor.from_pretrained("openai/clip-vit-large-patch14-336")
-            print("clip vision encoder is", self.image_processor)
 
             clip_model, processor = create_model_from_pretrained('hf-hub:apple/DFN5B-CLIP-ViT-H-14-384')
             self.image_processor = ProcessorWrapper(processor)
@@ -57,6 +55,16 @@ class CLIPVisionTower(nn.Module):
             self.vision_tower.output_tokens = True
             print(self.vision_tower)
             self._hidden_size = 1280
+        elif self.vision_tower_name == "siglip/CLIP-ViT-SO400M-14-384":
+            self.open_clip = True
+
+            clip_model, processor = create_model_from_pretrained('hf-hub:timm/ViT-SO400M-14-SigLIP-384')
+            self.image_processor = ProcessorWrapper(processor)
+            print("DFN CLIP is", self.image_processor)
+            self.vision_tower = clip_model.visual
+            self.vision_tower.output_tokens = True
+            print(self.vision_tower)
+            self._hidden_size = 1152
         else:
 
             self.open_clip = False
