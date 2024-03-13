@@ -61,7 +61,7 @@ class CLIPVisionTower(nn.Module):
             clip_model, processor = create_model_from_pretrained('hf-hub:timm/ViT-SO400M-14-SigLIP-384')
             self.image_processor = ProcessorWrapper(processor)
             self.vision_tower = clip_model.visual.trunk
-            print(self.vision_tower)
+            #print(self.vision_tower)
             self.vision_tower.output_tokens = True
             self._hidden_size = 1152
         else:
