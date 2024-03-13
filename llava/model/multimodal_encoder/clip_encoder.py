@@ -45,7 +45,7 @@ class CLIPVisionTower(nn.Module):
 
     def load_model(self):
         if self.vision_tower_name == "apple/DFN5B-CLIP-ViT-H-14-378":
-            self.open_clip = True
+            self.vision_model = "dfn-clip"
 
 
             clip_model, processor = create_model_from_pretrained('hf-hub:apple/DFN5B-CLIP-ViT-H-14-384')
@@ -56,17 +56,16 @@ class CLIPVisionTower(nn.Module):
             print(self.vision_tower)
             self._hidden_size = 1280
         elif self.vision_tower_name == "siglip/CLIP-ViT-SO400M-14-384":
-            self.open_clip = True
+            self.vision_model = "siglip"
             print("I am loading siglip")
             clip_model, processor = create_model_from_pretrained('hf-hub:timm/ViT-SO400M-14-SigLIP-384')
             self.image_processor = ProcessorWrapper(processor)
             self.vision_tower = clip_model.visual
             self.vision_tower.output_tokens = True
-            print(self.vision_tower)
             self._hidden_size = 1152
         else:
 
-            self.open_clip = False
+            self.vision_model = "oai-clip"
             self.image_processor = CLIPImageProcessor.from_pretrained(self.vision_tower_name)
             self.vision_tower = CLIPVisionModel.from_pretrained(self.vision_tower_name)
 
@@ -105,16 +104,20 @@ class CLIPVisionTower(nn.Module):
                 image_feature = self.feature_select(image_forward_out).to(image.dtype)
                 image_features.append(image_feature)
         else:
-            if not self.open_clip:
+            if self.vision_model == "oai-clip":
                 with torch.no_grad():
                     image_forward_outs = self.vision_tower(images.to(device=self.device, dtype=self.dtype), output_hidden_states=True)
                     image_features = self.feature_select(image_forward_outs).to(images.dtype)
-            else:
+            elif self.vision_model == "dfn-clip":
                 with torch.no_grad():
                     #print(images.shape)
                     _, image_features = self.vision_tower(images.to(device=self.device, dtype=self.dtype))
+            elif self.vision_model == "siglip":
+                with torch.no_grad():
+                    #print(images.shape)
+                    _, image_features = self.vision_tower.forward_features(images.to(device=self.device, dtype=self.dtype))
                     #print(image_forward_outs.shape)
-                    #image_features = self.feature_select(image_forward_outs).to(images.dtype)
+                    image_features = self.feature_select(image_forward_outs).to(images.dtype)
 
 
         return image_features
