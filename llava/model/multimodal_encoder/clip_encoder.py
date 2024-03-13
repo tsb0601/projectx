@@ -57,7 +57,7 @@ class CLIPVisionTower(nn.Module):
             self._hidden_size = 1280
         elif self.vision_tower_name == "siglip/CLIP-ViT-SO400M-14-384":
             self.vision_model = "siglip"
-            print("I am loading siglip")
+            #print("I am loading siglip")
             clip_model, processor = create_model_from_pretrained('hf-hub:timm/ViT-SO400M-14-SigLIP-384')
             self.image_processor = ProcessorWrapper(processor,height=384, width=384)
             self.vision_tower = clip_model.visual.trunk
@@ -119,7 +119,7 @@ class CLIPVisionTower(nn.Module):
                 with torch.no_grad():
                     #print(images.shape)
                     image_forward_outs = self.vision_tower.forward_features(images.to(device=self.device, dtype=self.dtype))
-                    print(image_forward_outs.shape)
+                    #print(image_forward_outs.shape)
                     #print(image_forward_outs.shape)
                     image_features = image_forward_outs[:, 1:]
 
