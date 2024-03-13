@@ -118,7 +118,7 @@ class CLIPVisionTower(nn.Module):
             elif self.vision_model == "siglip":
                 with torch.no_grad():
                     #print(images.shape)
-                    _, image_features = self.vision_tower.forward_features(images.to(device=self.device, dtype=self.dtype))
+                    image_features = self.vision_tower.forward_features(images.to(device=self.device, dtype=self.dtype))
                     #print(image_forward_outs.shape)
                     image_features = self.feature_select(image_forward_outs).to(images.dtype)
 
