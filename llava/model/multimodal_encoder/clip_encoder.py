@@ -7,8 +7,8 @@ from open_clip import create_model_from_pretrained, get_tokenizer
 class ProcessorWrapper:
     def __init__(self, transform, height=378, width=378):
         self._crop_size = {
-            "height": 378,
-            "width": 378,
+            "height": height,
+            "width": width, 
         }
         self._transforms = transform
         #print(transform)
@@ -59,7 +59,7 @@ class CLIPVisionTower(nn.Module):
             self.vision_model = "siglip"
             print("I am loading siglip")
             clip_model, processor = create_model_from_pretrained('hf-hub:timm/ViT-SO400M-14-SigLIP-384')
-            self.image_processor = ProcessorWrapper(processor,height =384, width=384)
+            self.image_processor = ProcessorWrapper(processor,height=384, width=384)
             self.vision_tower = clip_model.visual.trunk
             #print(self.vision_tower)
             self.vision_tower.output_tokens = True
