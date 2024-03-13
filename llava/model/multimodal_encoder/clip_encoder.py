@@ -61,6 +61,7 @@ class CLIPVisionTower(nn.Module):
             clip_model, processor = create_model_from_pretrained('hf-hub:timm/ViT-SO400M-14-SigLIP-384')
             self.image_processor = ProcessorWrapper(processor)
             self.vision_tower = clip_model.visual
+            print(self.vision_tower)
             self.vision_tower.output_tokens = True
             self._hidden_size = 1152
         else:
@@ -92,6 +93,8 @@ class CLIPVisionTower(nn.Module):
         #self.vision_tower.vision_model.encoder.gradient_checkpointing = False
 
         if self.vision_model == "oai-clip":
+
+
             from torch_xla.utils.checkpoint import checkpoint
             self.vision_tower.vision_model.encoder._gradient_checkpointing_func = checkpoint 
         
