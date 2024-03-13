@@ -15,7 +15,7 @@ python llava/train/train_tpu.py \
     --bf16 False \
     --output_dir ./checkpoints/llava-v1.5-13b-finetune-5565k \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 16 \
+    --per_device_train_batch_size 8 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \
