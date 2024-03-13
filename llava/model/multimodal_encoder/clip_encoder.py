@@ -50,16 +50,16 @@ class CLIPVisionTower(nn.Module):
 
             clip_model, processor = create_model_from_pretrained('hf-hub:apple/DFN5B-CLIP-ViT-H-14-384')
             self.image_processor = ProcessorWrapper(processor)
-            print("DFN CLIP is", self.image_processor)
+            #print("DFN CLIP is", self.image_processor)
             self.vision_tower = clip_model.visual
             self.vision_tower.output_tokens = True
-            print(self.vision_tower)
+            #print(self.vision_tower)
             self._hidden_size = 1280
         elif self.vision_tower_name == "siglip/CLIP-ViT-SO400M-14-384":
             self.vision_model = "siglip"
             print("I am loading siglip")
             clip_model, processor = create_model_from_pretrained('hf-hub:timm/ViT-SO400M-14-SigLIP-384')
-            self.image_processor = ProcessorWrapper(processor)
+            self.image_processor = ProcessorWrapper(processor,height =384, width=384)
             self.vision_tower = clip_model.visual.trunk
             #print(self.vision_tower)
             self.vision_tower.output_tokens = True
