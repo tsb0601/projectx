@@ -119,6 +119,7 @@ class CLIPVisionTower(nn.Module):
                 with torch.no_grad():
                     #print(images.shape)
                     image_forward_outs = self.vision_tower.forward_features(images.to(device=self.device, dtype=self.dtype))
+                    print(image_forward_outs)
                     #print(image_forward_outs.shape)
                     image_features = image_forward_outs[:, 1:]
 
