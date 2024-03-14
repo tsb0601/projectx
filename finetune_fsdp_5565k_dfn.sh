@@ -1,5 +1,3 @@
-#!/bin/bash
-
 python llava/train/train_tpu.py \
     --model_name_or_path lmsys/vicuna-7b-v1.5 \
     --version v1 \
