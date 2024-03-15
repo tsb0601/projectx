@@ -49,7 +49,7 @@ class GCloudRsyncCallback(TrainerCallback):
         if dest is None:
             dest = f"gs://{self.bucket}/{self.prefix}"
 
-        cmds = ["gcloud", "storage", "rsync", source, dest, "--project", self.gcp_project]
+        cmds = ["gcloud", "alpha", "storage", "rsync", source, dest, "--project", self.gcp_project]
         if recursive:
             cmds.append("--recursive")
         print(f"GCloudRsyncCallback:: Rsyncing via `{' '.join(cmds)}`...")
