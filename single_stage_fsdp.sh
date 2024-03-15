@@ -6,7 +6,7 @@ export WANDB_LOG_MODEL="checkpoint" &&
 python llava/train/train_tpu.py \
     --model_name_or_path lmsys/vicuna-7b-v1.5 \
     --version v1 \
-    --data_path /mnt/disks/storage/data/finetune_data/5565kL.jsonl \
+    --data_path /mnt/disks/storage/data/finetune_data/jsons/665k.jsonl \
     --image_folder /mnt/disks/storage/data/finetune_data \
     --vision_tower openai/clip-vit-large-patch14-336 \
     --mm_projector_type mlp2x_gelu \
@@ -31,7 +31,7 @@ python llava/train/train_tpu.py \
     --lr_scheduler_type "cosine" \
     --logging_steps 1 \
     --tf32 False \
-    --model_max_length 2048 \
+    --model_max_length 1024 \
     --gradient_checkpointing True \
     --dataloader_num_workers 4 \
     --lazy_preprocess True \
