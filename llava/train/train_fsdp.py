@@ -31,6 +31,7 @@ import tokenizers
 from llava.constants import IGNORE_INDEX, IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
 from torch.utils.data import Dataset
 from llava.train.llava_trainer import LLaVATrainer
+from llava.train.gcloud_rsync_callback import GCloudRsyncCallback
 
 from llava import conversation as conversation_lib
 from llava.model import *
@@ -112,6 +113,11 @@ class TrainingArguments(transformers.TrainingArguments):
 	mm_projector_lr: Optional[float] = None
 	group_by_modality_length: bool = field(default=False)
 
+	# GCSFS
+	gcp_project: Optional[str] = field(default=None)
+	"""Can also set GCP_PROJECT environment variable."""
+	gcs_output_dir: Optional[str] = field(default=None)
+	"""gs://<bucket>/<prefix>"""
 
 def maybe_zero_3(param, ignore_status=False, name=None):
 	from deepspeed import zero
@@ -1369,10 +1375,13 @@ def train(INDEX, attn_implementation=None):
 
 	# convert_to_bf16_except_llama(model)
 
+	gcloud_callback = GCloudRsyncCallback(training_args.output_dir, training_args.gcs_output_dir, training_args.gcp_project)
+
 	trainer = LLaVATrainer(model=model,
-					tokenizer=tokenizer,
-					args=training_args,
-					**data_module)
+                        tokenizer=tokenizer,
+                        args=training_args,
+                        callbacks=[gcloud_callback],
+                        **data_module)
 
 	if list(pathlib.Path(training_args.output_dir).glob("checkpoint-*")):
 		trainer.train(resume_from_checkpoint=True)
