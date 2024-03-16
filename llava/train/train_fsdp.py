@@ -1051,8 +1051,8 @@ class DataCollatorForSupervisedDataset(object):
 
 	def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
 
-		#image_token_len = 729
-		image_token_len = 576
+		image_token_len = 729
+		#image_token_len = 576
 		image_position = 35
 
 		input_ids, labels = tuple([instance[key] for instance in instances]
