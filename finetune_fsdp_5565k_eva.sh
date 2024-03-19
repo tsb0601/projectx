@@ -5,7 +5,7 @@ python llava/train/train_tpu.py \
     --version v1 \
     --data_path /mnt/disks/storage/data/finetune_data/5565kL.jsonl \
     --image_folder /mnt/disks/storage/data/finetune_data \
-    --vision_tower apple/DFN5B-CLIP-ViT-H-14-378 \
+    --vision_tower eva/CLIP-ViT-L-336 \
     --mm_projector_type mlp2x_gelu \
     --mm_vision_select_layer -2 \
     --mm_use_im_start_end False \
@@ -15,7 +15,7 @@ python llava/train/train_tpu.py \
     --bf16 False \
     --output_dir ./checkpoints/llava-v1.5-7b-finetune-5565k-dfnclip \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 4 \
+    --per_device_train_batch_size 16 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \
