@@ -5,8 +5,7 @@ export XLA_USE_BF16=0 &&
 export WANDB_LOG_MODEL="checkpoint" &&
 export CKPT_NAME="llava-v1.5-llama2-7b-finetune-5565k" &&
 python llava/train/train_tpu.py \
-    --model_name_or_path /mnt/disks/storage/llm_ckpts/llama-2-7b-hf
- \
+    --model_name_or_path /mnt/disks/storage/llm_ckpts/llama-2-7b-hf \
     --version v1 \
     --data_path /mnt/disks/storage/data/finetune_data/5565kL.jsonl \
     --image_folder /mnt/disks/storage/data/finetune_data \
