@@ -2,10 +2,10 @@ import transformers
 from ezcolorlog import log_stdout, root_logger as logger
 
 
-@log_stdout
-def load(_, model_name):
-    print("transformers.LlamaForCausalLM")
-    print(f"Loading LLM: {model_name}")
+def load(index, model_name):
+    logger.info(f"[IDX {index}] transformers.LlamaForCausalLM")
+
+    logger.info(f"[IDX {index}] Loading LLM: {model_name}")
     model = transformers.LlamaForCausalLM.from_pretrained(
         model_name,
         attn_implementation=None,
@@ -25,14 +25,14 @@ if __name__ == "__main__":
     import multiprocessing as mp
     import torch_xla.distributed.xla_multiprocessing as xmp
 
-    logger.info("Starting XMP spawn")
-    mp.set_start_method('spawn', force=True)
-    xmp.spawn(load, args=(args.model_name,), nprocs=1)
-    logger.info("Finished XMP spawn")
+    # logger.info("Starting XMP spawn")
+    # mp.set_start_method('spawn', force=True)
+    # xmp.spawn(load, args=(args.model_name,), nprocs=1)
+    # logger.info("Finished XMP spawn")
 
-    # # fork
-    # logger.info("Starting XMP fork")
-    # mp.set_start_method('fork', force=True)
-    # xmp.spawn(load, args=(args.model_name,), start_method='fork')
+    # fork
+    logger.info("Starting XMP fork")
+    mp.set_start_method('fork', force=True)
+    xmp.spawn(load, args=(args.model_name,), start_method='fork')
 
-    # logger.info("Finished XMP fork")
+    logger.info("Finished XMP fork")
