@@ -14,9 +14,6 @@ def load(model_name):
     print(f"Loaded model {model_name}")
 
 
-
-
-
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
