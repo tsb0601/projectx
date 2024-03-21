@@ -64,6 +64,15 @@ class CLIPVisionTower(nn.Module):
             #print(self.vision_tower)
             self.vision_tower.output_tokens = True
             self._hidden_size = 1152
+        elif self.vision_tower_name == "eva/CLIP-ViT-L-336":
+            self.vision_model = "evaclip"
+            #print("I am loading siglip")
+            clip_model, processor = create_model_from_pretrained('hf-hub:timm/eva02_large_patch14_clip_336.merged2b_s6b_b61k')
+            self.image_processor = ProcessorWrapper(processor,height=336, width=336)
+            self.vision_tower = clip_model.visual.trunk
+            #print(self.vision_tower)
+            self.vision_tower.output_tokens = True
+            self._hidden_size = 1024
         else:
 
             self.vision_model = "oai-clip"
@@ -115,7 +124,7 @@ class CLIPVisionTower(nn.Module):
                 with torch.no_grad():
                     #print(images.shape)
                     _, image_features = self.vision_tower(images.to(device=self.device, dtype=self.dtype))
-            elif self.vision_model == "siglip":
+            elif self.vision_model == "siglip" or self.vision_model == "evaclip":
                 with torch.no_grad():
                     #print(images.shape)
                     image_forward_outs = self.vision_tower.forward_features(images.to(device=self.device, dtype=self.dtype))

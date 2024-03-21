@@ -5,7 +5,7 @@ python llava/train/train_tpu.py \
     --version v1 \
     --data_path /mnt/disks/storage/data/finetune_data/5565kL.jsonl \
     --image_folder /mnt/disks/storage/data/finetune_data \
-    --vision_tower openai/clip-vit-large-patch14-336 \
+    --vision_tower siglip/CLIP-ViT-SO400M-14-384 \
     --mm_projector_type mlp2x_gelu \
     --mm_vision_select_layer -2 \
     --mm_use_im_start_end False \
@@ -13,9 +13,9 @@ python llava/train/train_tpu.py \
     --image_aspect_ratio pad \
     --group_by_modality_length True \
     --bf16 False \
-    --output_dir ./checkpoints/llava-v1.5-13b-finetune-5565k \
+    --output_dir ./checkpoints/llava-v1.5-13b-finetune-5565k-siglip \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 8 \
+    --per_device_train_batch_size 4 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \
@@ -35,4 +35,3 @@ python llava/train/train_tpu.py \
     --report_to wandb \
     --fsdp "full_shard" \
     --fsdp_config fsdp_config.json
-

@@ -276,6 +276,7 @@ class LLaVATrainer(Trainer):
             # consolidate_sharded_model_checkpoints(
             #     ckpt_prefix=ckpt_prefix, ckpt_suffix="_rank-*-of-*.pth", save_path = os.path.join(output_dir, "model_consolidated.pth"))
             # self.model.save_pretrained(output_dir, state_dict=None, safe_serialization=self.args.save_safetensors)
+            self.model.config.save_pretrained(output_dir)
             if self.tokenizer is not None:
                 self.tokenizer.save_pretrained(output_dir)
             TRAINING_ARGS_NAME = "training_args.bin"
