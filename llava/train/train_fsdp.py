@@ -39,7 +39,7 @@ from llava.mm_utils import tokenizer_image_token
 
 from PIL import Image
 
-from ezcolorlog import root_loggger as logger, log_stdout
+from ezcolorlog import root_logger as logger, log_stdout
 
 local_rank = None
 
