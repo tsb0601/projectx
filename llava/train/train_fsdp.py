@@ -1232,7 +1232,7 @@ def train(INDEX, attn_implementation=None):
 
     logger.info(f"Model loaded. Model config: {model.config}")\
 
-    logger.error("BREAKING HERE"); break
+    logger.error("BREAKING HERE"); exit()
 
     if training_args.bits in [4, 8]:
         from peft import prepare_model_for_kbit_training
