@@ -27,6 +27,6 @@ if __name__ == "__main__":
 
     logger.info("Starting XMP spawn")
 
-    mp.set_start_method('spawn', force=True)
+    # mp.set_start_method('spawn', force=True)
     xmp.spawn(load, args=(args.model_name,))
     logger.info("Finished XMP spawn")
