@@ -32,7 +32,7 @@ def load(index, model_name):
     with open(lock_file, "w") as fd:
         fcntl.lockf(fd, fcntl.LOCK_EX)
 
-        logger.log(f"Taking lock and loading model"
+        logger.log(f"Taking lock and loading model")
 
         # load a model here
         model = transformers.LlamaForCausalLM.from_pretrained(
