@@ -3,7 +3,7 @@
 export PJRT_DEVICE=TPU &&
 export XLA_USE_BF16=0 &&
 export WANDB_LOG_MODEL="checkpoint" &&
-export CKPT_NAME="llava-v1.5-llama2-7b-finetune-5565k" &&
+export CKPT_NAME="llava-v1.5-llama2-7b-finetune-5565k-bs512" &&
 python llava/train/train_tpu.py \
     --model_name_or_path /mnt/disks/storage/llm_ckpts/llama-2-7b-hf \
     --version v1 \
@@ -19,7 +19,7 @@ python llava/train/train_tpu.py \
     --bf16 False \
     --output_dir ./checkpoints/$CKPT_NAME \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 16 \
+    --per_device_train_batch_size 4 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \
