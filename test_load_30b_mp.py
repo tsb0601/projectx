@@ -5,13 +5,44 @@ from ezcolorlog import log_stdout, root_logger as logger
 def load(index, model_name):
     logger.info(f"[IDX {index}] transformers.LlamaForCausalLM")
 
-    logger.info(f"[IDX {index}] Loading LLM: {model_name}")
-    model = transformers.LlamaForCausalLM.from_pretrained(
-        model_name,
-        attn_implementation=None,
-        torch_dtype=None,
-    )
-    print(f"Loaded model {model_name}")
+    # logger.info(f"[IDX {index}] Loading LLM: {model_name}")
+    # model = transformers.LlamaForCausalLM.from_pretrained(
+    #     model_name,
+    #     attn_implementation=None,
+    #     torch_dtype=None,
+    # )
+    # print(f"Loaded model {model_name}")
+
+    """flock example -- https://github.com/pytorch/xla/issues/1262#issuecomment-548318533
+    lock_file = "tpu.lock"
+    fd = open(lock_file, "w")
+    fcntl.lockf(fd, fcntl.LOCK_EX)
+    #load a model here
+    model.train().to(device)
+    gc.collect()
+    fcntl.lockf(fd, fcntl.LOCK_UN)
+    #continue to training
+    """
+
+    import fcntl
+    import gc
+    import torch_xla.core.xla_model as xm
+
+    lock_file = "tpu.lock"
+    with open(lock_file, "w") as fd:
+        fcntl.lockf(fd, fcntl.LOCK_EX)
+
+        logger.log(f"Taking lock and loading model"
+
+        # load a model here
+        model = transformers.LlamaForCausalLM.from_pretrained(
+            model_name,
+            attn_implementation=None,
+            torch_dtype=None,
+        )
+        model.train().to(xm.xla_device())
+        gc.collect()
+        fcntl.lockf(fd, fcntl.LOCK_UN)
 
 
 if __name__ == "__main__":
