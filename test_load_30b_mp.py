@@ -3,7 +3,7 @@ from ezcolorlog import log_stdout, root_logger as logger
 
 
 @log_stdout
-def load(model_name):
+def load(_, model_name):
     print("transformers.LlamaForCausalLM")
     print(f"Loading LLM: {model_name}")
     model = transformers.LlamaForCausalLM.from_pretrained(
@@ -28,5 +28,5 @@ if __name__ == "__main__":
     logger.info("Starting XMP spawn")
 
     mp.set_start_method('spawn', force=True)
-    xmp.spawn(load, args=(args.model_name))
+    xmp.spawn(load, args=(args.model_name,))
     logger.info("Finished XMP spawn")
