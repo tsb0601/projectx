@@ -1232,6 +1232,11 @@ def train(INDEX, attn_implementation=None):
 
     logger.info(f"Model loaded. Model config: {model.config}")\
 
+    # XLA wait for model to be loaded\
+    logger.warning("XLA: Waiting for model to be loaded")
+    import torch_xla.core.xla_model as xm
+    xm.rendezvous('model_loaded')
+
     logger.error("BREAKING HERE"); exit()
 
     if training_args.bits in [4, 8]:
