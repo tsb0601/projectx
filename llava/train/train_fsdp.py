@@ -1230,7 +1230,9 @@ def train(INDEX, attn_implementation=None):
     if model_args.freeze_backbone:
         model.model.requires_grad_(False)
 
-    logger.info(f"Model loaded. Model config: {model.config}")
+    logger.info(f"Model loaded. Model config: {model.config}")\
+
+    logger.error("BREAKING HERE"); break
 
     if training_args.bits in [4, 8]:
         from peft import prepare_model_for_kbit_training
@@ -1434,4 +1436,3 @@ def train(INDEX, attn_implementation=None):
 
 if __name__ == "__main__":
     train()
-
