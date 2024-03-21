@@ -26,7 +26,13 @@ if __name__ == "__main__":
     import torch_xla.distributed.xla_multiprocessing as xmp
 
     logger.info("Starting XMP spawn")
-
-    # mp.set_start_method('spawn', force=True)
-    xmp.spawn(load, args=(args.model_name,))
+    mp.set_start_method('spawn', force=True)
+    xmp.spawn(load, args=(args.model_name,), nprocs=1)
     logger.info("Finished XMP spawn")
+
+    # # fork
+    # logger.info("Starting XMP fork")
+    # mp.set_start_method('fork', force=True)
+    # xmp.spawn(load, args=(args.model_name,), start_method='fork')
+
+    # logger.info("Finished XMP fork")
