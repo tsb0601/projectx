@@ -1,5 +1,9 @@
 #!/bin/bash
 
+export PJRT_DEVICE=TPU &&
+export XLA_USE_BF16=0 &&
+export WANDB_LOG_MODEL="checkpoint" &&
+export CKPT_NAME="llava-v1.5-vicuna-33b-finetune-5565k-bs512" &&
 python llava/train/train_tpu.py \
     --model_name_or_path /mnt/disks/storage/llm_ckpts/vicuna-33b-v1.3 \
     --version v1 \
@@ -13,9 +17,8 @@ python llava/train/train_tpu.py \
     --image_aspect_ratio pad \
     --group_by_modality_length True \
     --bf16 False \
-    --output_dir ./checkpoints/llava-v1.5-33b-finetune-5565k \
+    --output_dir ./checkpoints/$CKPT_NAME \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 8 \
     --per_device_train_batch_size 8 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
@@ -34,6 +37,9 @@ python llava/train/train_tpu.py \
     --dataloader_num_workers 4 \
     --lazy_preprocess True \
     --report_to wandb \
+    --run_name "[TPU] $CKPT_NAME" \
     --fsdp "full_shard" \
-    --fsdp_config fsdp_config.json
+    --fsdp_config fsdp_config.json \
+    --gcp_project "nyu-vision-lab" \
+    --gcs_output_dir "gs://us-central2-storage/cambrian/checkpoints/$CKPT_NAME"
 
