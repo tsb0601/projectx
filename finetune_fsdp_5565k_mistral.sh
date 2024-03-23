@@ -38,7 +38,7 @@ python llava/train/train_tpu.py \
     --dataloader_num_workers 4 \
     --lazy_preprocess True \
     --report_to wandb \
-    --run_name "[TPU] $CKPT_NAME" \
+    --run_name $CKPT_NAME \
     --fsdp "full_shard" \
     --fsdp_config fsdp_config.json \
     # --gcp_project "nyu-vision-lab" \

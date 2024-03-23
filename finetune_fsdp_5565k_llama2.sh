@@ -20,7 +20,7 @@ python llava/train/train_tpu.py \
     --bf16 False \
     --output_dir ./checkpoints/$CKPT_NAME \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 4 \
+    --per_device_train_batch_size 16 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \
@@ -38,7 +38,7 @@ python llava/train/train_tpu.py \
     --dataloader_num_workers 4 \
     --lazy_preprocess True \
     --report_to wandb \
-    --run_name "[TPU] $CKPT_NAME" \
+    --run_name $CKPT_NAME \
     --fsdp "full_shard" \
     --fsdp_config fsdp_config.json \
     # --gcp_project "nyu-vision-lab" \
