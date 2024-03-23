@@ -1203,12 +1203,18 @@ def train(INDEX, attn_implementation=None):
 				**bnb_model_from_pretrained_args
 			)
 		else:
-			model = LlavaLlamaForCausalLM.from_pretrained(
-				model_args.model_name_or_path,
-				cache_dir=training_args.cache_dir,
-				torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
-				**bnb_model_from_pretrained_args
-			)
+
+			if local_rank==0:
+				model = LlavaLlamaForCausalLM.from_pretrained(
+					model_args.model_name_or_path,
+					cache_dir=training_args.cache_dir,
+					torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
+					**bnb_model_from_pretrained_args
+				)
+			else:
+				config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path)
+				with torch.device("meta"):
+					model = LlavaLlamaForCausalLM(config)
 	else:
 		model = transformers.LlamaForCausalLM.from_pretrained(
 			model_args.model_name_or_path,
