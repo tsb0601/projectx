@@ -15,7 +15,7 @@ python llava/train/train_fsdpv2.py \
     --bf16 False \
     --output_dir ./checkpoints/llava-v1.5-7b-finetune-5565k \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 256 \
+    --per_device_train_batch_size 128 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \
