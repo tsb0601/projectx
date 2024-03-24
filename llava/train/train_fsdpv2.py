@@ -38,10 +38,10 @@ from llava.mm_utils import tokenizer_image_token
 
 from PIL import Image
 
-import torch_xla.runtime as xr
+# import torch_xla.runtime as xr
 
-# Enable SPMD mode execution
-xr.use_spmd()
+# # Enable SPMD mode execution
+# xr.use_spmd()
 
 
 local_rank = None
