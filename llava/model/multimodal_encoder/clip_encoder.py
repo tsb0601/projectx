@@ -104,8 +104,8 @@ class CLIPVisionTower(nn.Module):
         if self.vision_model == "oai-clip":
 
 
-            from torch_xla.utils.checkpoint import checkpoint
-            self.vision_tower.vision_model.encoder._gradient_checkpointing_func = checkpoint 
+            # from torch_xla.utils.checkpoint import checkpoint
+            # self.vision_tower.vision_model.encoder._gradient_checkpointing_func = checkpoint 
         
         
 
