@@ -1209,7 +1209,8 @@ def train(INDEX, attn_implementation=None):
 			# 		torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
 			# 		**bnb_model_from_pretrained_args
 			# 	)
-			
+			from torch_xla.core.xla_model import broadcast_master_param
+
 			if local_rank==0:
 				model = LlavaLlamaForCausalLM.from_pretrained(
 					model_args.model_name_or_path,
@@ -1222,6 +1223,8 @@ def train(INDEX, attn_implementation=None):
 				config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path)
 				#with torch.device("meta"):
 				model = LlavaLlamaForCausalLM(config, do_sample=True)
+			broadcast_master_param(model)
+
 	else:
 		model = transformers.LlamaForCausalLM.from_pretrained(
 			model_args.model_name_or_path,
