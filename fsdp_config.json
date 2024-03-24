@@ -4,6 +4,7 @@
 
     ],
     "xla": true,
+    "xla_fsdp_v2": true,
     "xla_fsdp_settings": {
         "compute_dtype": "bfloat16",
         "shard_param_on_dim_0": true,
