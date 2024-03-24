@@ -1220,8 +1220,8 @@ def train(INDEX, attn_implementation=None):
 				)
 			else:
 				config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path)
-				with torch.device("meta"):
-					model = LlavaLlamaForCausalLM(config, do_sample=True)
+				#with torch.device("meta"):
+				model = LlavaLlamaForCausalLM(config, do_sample=True)
 	else:
 		model = transformers.LlamaForCausalLM.from_pretrained(
 			model_args.model_name_or_path,
