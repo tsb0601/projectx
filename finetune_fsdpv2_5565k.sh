@@ -29,7 +29,7 @@ python llava/train/train_fsdpv2.py \
     --logging_steps 1 \
     --tf32 False \
     --model_max_length 2048 \
-    --gradient_checkpointing False \
+    --gradient_checkpointing True \
     --dataloader_num_workers 4 \
     --lazy_preprocess True \
     --report_to wandb \
