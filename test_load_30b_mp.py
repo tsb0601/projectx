@@ -40,6 +40,7 @@ def load(index, model_name):
             attn_implementation=None,
             torch_dtype=None,
         )
+        logger.info(f"Loaded model {model_name}. Putting on {xm.xla_device()}")
         model.train().to(xm.xla_device())
         gc.collect()
         logger.info(f"Loaded model {model_name}")
