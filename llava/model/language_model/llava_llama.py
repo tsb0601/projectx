@@ -43,22 +43,13 @@ class LlavaLlamaModel(LlavaMetaModel, LlamaModel):
 class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
     config_class = LlavaConfig
 
-    def __init__(self, config, spmd_debug=None, spmd_mesh=None, spmd_fsdp_sharding=None):
+    def __init__(self, config):
         super(LlamaForCausalLM, self).__init__(config)
         
-        config.spmd_debug = spmd_debug
-        config.spmd_mesh = spmd_mesh
-        config.spmd_fsdp_sharding = spmd_fsdp_sharding
         self.model = LlavaLlamaModel(config)
         self.pretraining_tp = config.pretraining_tp
         self.vocab_size = config.vocab_size
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
-        self.spmd_mesh = spmd_mesh
-        self.spmd_debug = spmd_debug
-        self.spmd_fsdp_sharding = spmd_fsdp_sharding
-        
-        # TODO(jonbolin): Removing the SPMD mesh from the config since it is not serializable.
-        del config.spmd_mesh
         
         # Initialize weights and apply final processing
         self.post_init()
