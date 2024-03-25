@@ -1164,20 +1164,19 @@ def train(attn_implementation=None):
     model = apply_xla_patch_to_nn_linear(model, xs.xla_patched_nn_linear_forward)
 
 
-    torch.utils.checkpoint = torch_xla.utils.checkpoint
+    #torch.utils.checkpoint = torch_xla.utils.checkpoint
 
-    model = model.to(xm.xla_device(), dtype=torch.bfloat16)
+    model = model.to(xm.xla_device())
 
-    # Shard each parameter in the model based on the sharding strategy provided.
     for name, param in model.named_parameters():
         # Apply 2D sharding:
-        
         #print('> [2D] Sharding tensor', name, param.shape)
-        
         # We don't care about layernorm's weights, and
         # LLaMA doesn't use biases.
+        
         if len(param.shape) == 1:
             continue
+        
         if 'embed_tokens' in name:
             xs.mark_sharding(param, spmd_mesh, ('model', 'data'))
         elif 'q_proj' in name or 'k_proj' in name or 'v_proj' in name:
@@ -1190,15 +1189,29 @@ def train(attn_implementation=None):
             xs.mark_sharding(param, spmd_mesh, ('data', 'model'))
         elif 'lm_head' in name:
             xs.mark_sharding(param, spmd_mesh, ('model', 'data'))
-        # The following are written for Vision encoder and Adapter in LLaVA
-        #elif 'vision_tower' in name:
-        #    xs.mark_sharding(param, spmd_mesh, ('model', 'data'))
-        # elif 'mm_projector' in name:
-        #     xs.mark_sharding(param, spmd_mesh, ('data', 'model'))
         else:
-            pass
-            #print("Not sharded:", name)
-        #print(f'{name} {torch_xla._XLAC._get_xla_sharding_spec(param)}')
+            # Determine sharding strategy based on parameter tensor shape and name
+            if 'fc' in name or 'proj' in name:
+                # Fully connected or projection layers
+                if param.shape[0] > param.shape[1]:
+                    # Output dimension is larger, shard along 'model'
+                    xs.mark_sharding(param, spmd_mesh, ('model', 'data'))
+                else:
+                    # Input dimension is larger or equal, shard along 'data'
+                    xs.mark_sharding(param, spmd_mesh, ('data', 'model'))
+            elif 'conv' in name:
+                # Convolutional layers
+                if param.shape[0] > param.shape[1]:
+                    # Output channels are larger, shard along 'model'
+                    xs.mark_sharding(param, spmd_mesh, ('model', 'data'))
+                else:
+                    # Input channels are larger or equal, shard along 'data'
+                    xs.mark_sharding(param, spmd_mesh, ('data', 'model'))
+            else:
+                print("I didn't shard", name)
+                # Other layers, use a default sharding strategy
+                # xs.mark_sharding(param, spmd_mesh, ('model', 'data'))
+    
     
     #print(model)
 
