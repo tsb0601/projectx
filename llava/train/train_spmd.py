@@ -993,7 +993,7 @@ def train(attn_implementation=None):
 
     import torch_xla.core.xla_model as xm
     import torch_xla.experimental.xla_sharding as xs
-    spmd_2d_sharding = 8
+    spmd_2d_sharding = 4
     spmd_dcn_parallelism = 1
 
     # Place DCN on an independent axis in the mesh. Model parameters should be
