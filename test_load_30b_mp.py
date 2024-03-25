@@ -51,6 +51,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_name", type=str, default="lmsys/vicuna-7b-v1.5")
+    parser.add_argument("--num_processes", type=int, default=None)
     args = parser.parse_args()
 
     # load(args.model_name)
@@ -60,7 +61,7 @@ if __name__ == "__main__":
 
     logger.info("Starting XMP spawn")
     mp.set_start_method('spawn', force=True)
-    xmp.spawn(load, args=(args.model_name,), nprocs=8)
+    xmp.spawn(load, args=(args.model_name,), nprocs=args.num_processes)
     logger.info("Finished XMP spawn")
 
     # # fork
