@@ -1,6 +1,6 @@
 #!/bin/bash
 
-python llava/train/train_tpu.py \
+python llava/train/train_fsdpv2.py \
     --model_name_or_path lmsys/vicuna-7b-v1.5 \
     --version v1 \
     --data_path /mnt/disks/storage/data/finetune_data/5565kL.jsonl \
@@ -15,7 +15,7 @@ python llava/train/train_tpu.py \
     --bf16 False \
     --output_dir ./checkpoints/llava-v1.5-7b-finetune-5565k \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 16 \
+    --per_device_train_batch_size 64 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \
@@ -34,5 +34,5 @@ python llava/train/train_tpu.py \
     --lazy_preprocess True \
     --report_to wandb \
     --fsdp "full_shard" \
-    --fsdp_config fsdp_config.json
+    --fsdp_config fsdp_config_v2.json
 
