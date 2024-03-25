@@ -1382,8 +1382,11 @@ def train(attn_implementation=None):
 
 
 	# convert_to_bf16_except_llama(model)
-	if training_args.bf16:
-		model = model.to(dtype = torch.float32)
+	# if training_args.bf16:
+	# 	model = model.to(dtype = torch.float32)
+	
+	training_args.dataloader_drop_last = True
+
 
 	trainer = LLaVATrainer(model=model,
 					tokenizer=tokenizer,
