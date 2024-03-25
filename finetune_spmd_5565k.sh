@@ -1,7 +1,7 @@
 #!/bin/bash
 
 python llava/train/train_spmd.py \
-    --model_name_or_path lmsys/vicuna-7b-v1.5 \
+    --model_name_or_path /mnt/disks/storage/llm_ckpts/vicuna-33b-v1.3 \
     --version v1 \
     --data_path /mnt/disks/storage/data/finetune_data/5565kL.jsonl \
     --image_folder /mnt/disks/storage/data/finetune_data \
