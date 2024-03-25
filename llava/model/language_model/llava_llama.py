@@ -94,8 +94,8 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
         # Very Important for TorchXLA
         #self.model.gradient_checkpointing = False
             
-        # from torch_xla.utils.checkpoint import checkpoint
-        # self.model._gradient_checkpointing_func = checkpoint
+        from torch_xla.utils.checkpoint import checkpoint
+        self.model._gradient_checkpointing_func = checkpoint
 
         output = super().forward(
             input_ids=input_ids,
