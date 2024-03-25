@@ -1209,20 +1209,18 @@ def train(attn_implementation=None):
         # LLaMA-specific
         xs.apply_backward_optimization_barrier(model.model.layers[i])
 
-    print("Applying gradient checkpointing")
-    from torch_xla.distributed.fsdp import checkpoint_module
-    # for i, block in enumerate(model.model.vision_tower.vision_tower.vision_model.encoder.layers):
-    #     # CLIP-specific
-    #     model.model.vision_tower.vision_tower.vision_model.encoder.layers[i] = checkpoint_module(block)
+    # print("Applying gradient checkpointing")
+    # from torch_xla.distributed.fsdp import checkpoint_module
+    # # for i, block in enumerate(model.model.vision_tower.vision_tower.vision_model.encoder.layers):
+    # #     # CLIP-specific
+    # #     model.model.vision_tower.vision_tower.vision_model.encoder.layers[i] = checkpoint_module(block)
 
 
     for i, block in enumerate(model.model.layers):
         # LLaMA-specific
         model.model.layers[i] = checkpoint_module(block)
-
- 
-
     
+    training_args.dataloader_drop_last = True
 
     trainer = LLaVATrainer(model=model,
                     tokenizer=tokenizer,
