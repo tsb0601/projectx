@@ -59,7 +59,7 @@ if __name__ == "__main__":
     import multiprocessing as mp
     import torch_xla.distributed.xla_multiprocessing as xmp
 
-    logger.info("Starting XMP spawn")
+    logger.info(f"Starting XMP spawn with {args.nprocs} procs")
     mp.set_start_method('spawn', force=True)
     xmp.spawn(load, args=(args.model_name,), nprocs=args.nprocs)
     logger.info("Finished XMP spawn")
