@@ -1137,78 +1137,6 @@ def convert_to_bf16_except_llama(model):
 
 
 
-def patch_llama_reset_parameters():
-    from transformers.models.llama.modeling_llama import (
-        LlamaRMSNorm,
-        LlamaMLP,
-        LlamaAttention,
-        LlamaDecoderLayer,
-        LlamaModel,
-        LlamaForCausalLM,
-        LlamaForSequenceClassification,
-    )
-
-    def llama_rms_norm_reset_parameters(self):
-        self.weight.data.fill_(1.0)
-
-    def llama_mlp_reset_parameters(self):
-        if self.gate_proj.weight.dim() > 1:
-            nn.init.xavier_uniform_(self.gate_proj.weight)
-        if self.up_proj.weight.dim() > 1:
-            nn.init.xavier_uniform_(self.up_proj.weight)
-        if self.down_proj.weight.dim() > 1:
-            nn.init.xavier_uniform_(self.down_proj.weight)
-
-    def llama_attention_reset_parameters(self):
-        if self.q_proj.weight.dim() > 1:
-            nn.init.xavier_uniform_(self.q_proj.weight)
-            if self.config.attention_bias:
-                nn.init.constant_(self.q_proj.bias, 0.0)
-        if self.k_proj.weight.dim() > 1:
-            nn.init.xavier_uniform_(self.k_proj.weight)
-            if self.config.attention_bias:
-                nn.init.constant_(self.k_proj.bias, 0.0)
-        if self.v_proj.weight.dim() > 1:
-            nn.init.xavier_uniform_(self.v_proj.weight)
-            if self.config.attention_bias:
-                nn.init.constant_(self.v_proj.bias, 0.0)
-        if self.o_proj.weight.dim() > 1:
-            nn.init.xavier_uniform_(self.o_proj.weight)
-            if self.config.attention_bias:
-                nn.init.constant_(self.o_proj.bias, 0.0)
-
-    def llama_decoder_layer_reset_parameters(self):
-        self.self_attn.reset_parameters()
-        self.mlp.reset_parameters()
-        self.input_layernorm.reset_parameters()
-        self.post_attention_layernorm.reset_parameters()
-
-    def llama_model_reset_parameters(self):
-        self.embed_tokens.reset_parameters()
-        for layer in self.layers:
-            layer.reset_parameters()
-        self.norm.reset_parameters()
-
-    def llama_for_causal_lm_reset_parameters(self):
-        self.model.reset_parameters()
-        if self.lm_head.weight.dim() > 1:
-            self.lm_head.reset_parameters()
-
-    def llama_for_sequence_classification_reset_parameters(self):
-        self.model.reset_parameters()
-        if self.score.weight.dim() > 1:
-            self.score.reset_parameters()
-
-
-
-    LlamaRMSNorm.reset_parameters = llama_rms_norm_reset_parameters
-    LlamaMLP.reset_parameters = llama_mlp_reset_parameters
-    LlamaAttention.reset_parameters = llama_attention_reset_parameters
-    LlamaDecoderLayer.reset_parameters = llama_decoder_layer_reset_parameters
-    LlamaModel.reset_parameters = llama_model_reset_parameters
-    LlamaForCausalLM.reset_parameters = llama_for_causal_lm_reset_parameters
-    LlamaForSequenceClassification.reset_parameters = llama_for_sequence_classification_reset_parameters
-    
 
 def train(INDEX, attn_implementation=None):
 #def train(attn_implementation=None):
@@ -1236,7 +1164,7 @@ def train(INDEX, attn_implementation=None):
 		return output
 
 	transformers.models.llama.modeling_llama.LlamaRMSNorm.forward = forward
-	patch_llama_reset_parameters()
+
 	print("I changed forward!")
 
 
@@ -1284,20 +1212,13 @@ def train(INDEX, attn_implementation=None):
 			#from torch_xla.core.xla_model import broadcast_master_param
 
 			#if local_rank==0:
-			if local_rank==0:
-					model = LlavaLlamaForCausalLM.from_pretrained(
-						model_args.model_name_or_path,
-						cache_dir=training_args.cache_dir,
-						torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
-						do_sample=True,
-						**bnb_model_from_pretrained_args
-					)
-			else:
-				with torch.device("meta"):
-					config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path, do_sample=True, cache_dir=training_args.cache_dir, **bnb_model_from_pretrained_args)
-
-					model = LlavaLlamaForCausalLM(config)
-		
+			model = LlavaLlamaForCausalLM.from_pretrained(
+				model_args.model_name_or_path,
+				cache_dir=training_args.cache_dir,
+				do_sample=True,
+				torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
+				**bnb_model_from_pretrained_args
+			)
 			# else:
 			# 	config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path)
 			# 	#with torch.device("meta"):
