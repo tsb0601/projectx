@@ -39,7 +39,12 @@ from llava.train.gcloud_rsync_callback import GCloudRsyncCallback
 
 from PIL import Image
 
+from packaging import version
+
 from ezcolorlog import root_logger as logger, log_stdout
+
+
+logger.setLevel(logging.WARNING)
 
 local_rank = None
 
@@ -48,8 +53,6 @@ def rank0_print(*args):
     if local_rank == 0:
         print(*args)
 
-
-from packaging import version
 
 IS_TOKENIZER_GREATER_THAN_0_14 = version.parse(tokenizers.__version__) >= version.parse('0.14')
 

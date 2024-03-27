@@ -82,4 +82,3 @@ class GCloudRsyncCallback(TrainerCallback):
         if state.is_world_process_zero and self.initialized:
             print("GCloudRsyncCallback:: Rsyncing after saving checkpoint...")
             self.rsync()
-
