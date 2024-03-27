@@ -1146,7 +1146,6 @@ def convert_to_bf16_except_llama(model):
             print(f"{name} this is not converted")
 
 
-@log_stdout
 def train(INDEX, attn_implementation=None):
     # def train(attn_implementation=None):
 
