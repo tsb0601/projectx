@@ -1205,7 +1205,7 @@ def train(INDEX, attn_implementation=None):
 
     if model_args.vision_tower is not None:
         if 'mpt' in model_args.model_name_or_path:
-            logger.info(f"MPT model, loading LlavaMptForCausalLM: {model_args.model_name_or_path}")
+            logger.warning(f"MPT model, loading LlavaMptForCausalLM: {model_args.model_name_or_path}")
             config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
             config.attn_config['attn_impl'] = training_args.mpt_attn_impl
             model = LlavaMptForCausalLM.from_pretrained(
@@ -1214,8 +1214,8 @@ def train(INDEX, attn_implementation=None):
                 cache_dir=training_args.cache_dir,
                 **bnb_model_from_pretrained_args
             )
-        elif 'mistral' in model_args.model_name_or_path:
-            logger.info(f"Vision tower, loading LlavaMistralForCausalLM: {model_args.model_name_or_path}")
+        elif 'mistral' in model_args.model_name_or_path.lower():
+            logger.warning(f"Vision tower, loading LlavaMistralForCausalLM: {model_args.model_name_or_path}")
             model = LlavaMistralForCausalLM.from_pretrained(
                 model_args.model_name_or_path,
                 cache_dir=training_args.cache_dir,
@@ -1233,7 +1233,7 @@ def train(INDEX, attn_implementation=None):
             #from torch_xla.core.xla_model import broadcast_master_param
 
             #if local_rank==0:
-            logger.info(f"Vision tower, loading LlavaLlamaForCausalLM: {model_args.model_name_or_path}")
+            logger.warning(f"Vision tower, loading LlavaLlamaForCausalLM: {model_args.model_name_or_path}")
             model = LlavaLlamaForCausalLM.from_pretrained(
                 model_args.model_name_or_path,
                 cache_dir=training_args.cache_dir,
@@ -1247,7 +1247,7 @@ def train(INDEX, attn_implementation=None):
             #   model = LlavaLlamaForCausalLM(config, do_sample=True)
             #broadcast_master_param(model)
     else:
-        logger.info(f"No vision tower, loading pure language model: {model_args.model_name_or_path}")
+        logger.warning(f"No vision tower, loading pure language model: {model_args.model_name_or_path}")
         model = transformers.LlamaForCausalLM.from_pretrained(
             model_args.model_name_or_path,
             cache_dir=training_args.cache_dir,
