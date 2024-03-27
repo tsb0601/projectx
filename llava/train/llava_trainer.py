@@ -324,6 +324,7 @@ class LLaVATrainer(Trainer):
             resume_from_checkpoint = None
 
         # memory metrics - must set up as early as possible
+        logger.info("setup memory tracker")
         self._memory_tracker.start()
 
         args = self.args
@@ -332,11 +333,15 @@ class LLaVATrainer(Trainer):
 
         # Attach NEFTune hooks if necessary
         if self.neftune_noise_alpha is not None:
+            logger.info("Attaching NEFTune hooks")
             self.model = self._activate_neftune(self.model)
 
         # do_train is not a reliable argument, as it might not be set and .train() still called, so
         # the following is a workaround:
         if (args.fp16_full_eval or args.bf16_full_eval) and not args.do_train:
+            logger.warning(
+                "You passed `fp16_full_eval=True` or `bf16_full_eval=True` without `do_train=True`. We won't convert the model to FP16 for evaluation."
+            )
             self._move_model_to_device(self.model, args.device)
 
         if "model_path" in kwargs:
@@ -349,12 +354,14 @@ class LLaVATrainer(Trainer):
         if len(kwargs) > 0:
             raise TypeError(f"train() received got unexpected keyword arguments: {', '.join(list(kwargs.keys()))}.")
         # This might change the seed so needs to run first.
+        logger.info("hp search setup")
         self._hp_search_setup(trial)
         self._train_batch_size = self.args.train_batch_size
 
         # Model re-init
         model_reloaded = False
         if self.model_init is not None:
+            logger.info("Reinitializing model")
             # Seed must be set before instantiating the model when using model_init.
             enable_full_determinism(self.args.seed) if self.args.full_determinism else set_seed(self.args.seed)
             self.model = self.call_model_init(trial)
@@ -364,11 +371,13 @@ class LLaVATrainer(Trainer):
 
         # Load potential model checkpoint
         if isinstance(resume_from_checkpoint, bool) and resume_from_checkpoint:
+            logger.info(f"Loading model from {args.output_dir}")
             resume_from_checkpoint = get_last_checkpoint(args.output_dir)
             if resume_from_checkpoint is None:
                 raise ValueError(f"No valid checkpoint found in output directory ({args.output_dir})")
 
         if resume_from_checkpoint is not None:
+            logger.info(f"Loading model from {resume_from_checkpoint}")
             if not is_sagemaker_mp_enabled() and not self.is_deepspeed_enabled and not self.is_fsdp_enabled:
                 self._load_from_checkpoint(resume_from_checkpoint)
             # In case of repeating the find_executable_batch_size, set `self._train_batch_size` properly
@@ -378,10 +387,12 @@ class LLaVATrainer(Trainer):
 
         # If model was re-initialized, put it on the right device and update self.model_wrapped
         if model_reloaded:
+            logger.info("Model reinitialized. Moving model to device")
             if self.place_model_on_device:
                 self._move_model_to_device(self.model, args.device)
             self.model_wrapped = self.model
 
+        logger.info("Finding best batch size")
         inner_training_loop = find_executable_batch_size(
             self._inner_training_loop, self._train_batch_size, args.auto_find_batch_size
         )
@@ -398,6 +409,7 @@ class LLaVATrainer(Trainer):
             finally:
                 hf_hub_utils.enable_progress_bars()
         else:
+            logger.info("Training")
             return inner_training_loop(
                 args=args,
                 resume_from_checkpoint=resume_from_checkpoint,
