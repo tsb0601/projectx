@@ -4,6 +4,7 @@ import torch.nn as nn
 
 from torch.utils.data import Sampler
 
+from tqdm import tqdm
 from transformers import Trainer
 from transformers.trainer import (
     is_sagemaker_mp_enabled,
@@ -14,6 +15,8 @@ from transformers.trainer import (
 )
 from typing import List, Optional
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
+from transformers.trainer import *
+
 from ezcolorlog import root_logger as logger
 
 
@@ -289,12 +292,13 @@ class LLaVATrainer(Trainer):
     def _inner_training_loop(
         self, batch_size=None, args=None, resume_from_checkpoint=None, trial=None, ignore_keys_for_eval=None
     ):
-        from transformers.trainer import *
-
+        logger.info(f"Freeing memory...")
         self.accelerator.free_memory()
         self._train_batch_size = batch_size
         if self.args.auto_find_batch_size:
+            logger.info(f"Auto batch size: {self._train_batch_size}")
             if self.state.train_batch_size != self._train_batch_size:
+                logger.info(f"Training batch size has changed from {self.state.train_batch_size} to {self._train_batch_size}. Release memory...")
                 from accelerate.utils import release_memory
 
                 (self.model_wrapped,) = release_memory(self.model_wrapped)
@@ -357,6 +361,8 @@ class LLaVATrainer(Trainer):
                 "args.max_steps must be set to a positive value if dataloader does not have a length, was"
                 f" {args.max_steps}"
             )
+        
+        logger.info(f"num_train_epochs: {num_train_epochs}")
 
         if DebugOption.UNDERFLOW_OVERFLOW in self.args.debug:
             if self.args.n_gpu > 1:
@@ -420,10 +426,12 @@ class LLaVATrainer(Trainer):
         use_accelerator_prepare = True if model is self.model else False
 
         if delay_optimizer_creation:
+            logger.info("Delaying the creation of the optimizer and scheduler to the first training step.")
             self.create_optimizer_and_scheduler(num_training_steps=max_steps)
 
         # prepare using `accelerator` prepare
         if use_accelerator_prepare:
+            logger.info("Using `accelerator.prepare` to prepare the model for training.")
             self.model.train()
             if hasattr(self.lr_scheduler, "step"):
                 if self.use_apex:
@@ -455,6 +463,7 @@ class LLaVATrainer(Trainer):
                 self._load_from_checkpoint(resume_from_checkpoint, self.model_wrapped)
 
         # Check if saved optimizer or scheduler states exist
+        logger.info("Check if saved optimizer or scheduler states exist")
         self._load_optimizer_and_scheduler(resume_from_checkpoint)
 
         # important: at this point:
@@ -484,6 +493,7 @@ class LLaVATrainer(Trainer):
         if resume_from_checkpoint is not None and os.path.isfile(
             os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME)
         ):
+            logger.info(f"***** Load training state {os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME)} *****")
             self.state = TrainerState.load_from_json(os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME))
             epochs_trained = self.state.global_step // num_update_steps_per_epoch
             if not args.ignore_data_skip:
@@ -500,6 +510,8 @@ class LLaVATrainer(Trainer):
                     f"  Will skip the first {epochs_trained} epochs then the first"
                     f" {steps_trained_in_current_epoch} batches in the first epoch."
                 )
+
+        logger.info("***** Running training *****")
 
         # Update the references
         self.callback_handler.model = self.model
@@ -522,6 +534,8 @@ class LLaVATrainer(Trainer):
         self.state.is_local_process_zero = self.is_local_process_zero()
         self.state.is_world_process_zero = self.is_world_process_zero()
 
+        logger.info("***** Running training *****")
+
         # tr_loss is a tensor to avoid synchronization of TPUs through .item()
         tr_loss = torch.tensor(0.0).to(args.device)
         # _total_loss_scalar is updated everytime .item() has to be called on tr_loss and stores the sum of all losses
@@ -529,10 +543,12 @@ class LLaVATrainer(Trainer):
         self._globalstep_last_logged = self.state.global_step
         model.zero_grad()
 
+        logger.info("On train begin")
         self.control = self.callback_handler.on_train_begin(args, self.state, self.control)
 
         # Skip the first epochs_trained epochs to get the random state of the dataloader at the right point.
         if not args.ignore_data_skip:
+            logger.info(f"Skipping the first {epochs_trained} epochs")
             for epoch in range(epochs_trained):
                 sampler = get_dataloader_sampler(train_dataloader)
                 sampler_kinds = [RandomSampler]
@@ -578,7 +594,7 @@ class LLaVATrainer(Trainer):
                 rng_to_sync = True
 
             step = -1
-            for step, inputs in enumerate(epoch_iterator):
+            for step, inputs in tqdm(enumerate(epoch_iterator), desc="Iteration")):
                 total_batched_samples += 1
 
                 if self.args.include_num_input_tokens_seen:
@@ -590,8 +606,10 @@ class LLaVATrainer(Trainer):
                             "a `main_input_name` attribute to the model class you are using."
                         )
                     else:
+                        logger.info(f"Gathering input tokens from {main_input_name}")
                         self.state.num_input_tokens_seen += self.accelerator.gather(inputs[main_input_name]).numel()
                 if rng_to_sync:
+                    logger.info("Syncing RNG states between workers")
                     self._load_rng_state(resume_from_checkpoint)
                     rng_to_sync = False
 
@@ -608,9 +626,11 @@ class LLaVATrainer(Trainer):
                     steps_trained_progress_bar = None
 
                 if step % args.gradient_accumulation_steps == 0:
+                    logger.info("On step begin")
                     self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
 
                 with self.accelerator.accumulate(model):
+                    logger.info("Training step")
                     tr_loss_step = self.training_step(model, inputs)
 
                 if (
@@ -659,6 +679,7 @@ class LLaVATrainer(Trainer):
                             )
 
                     # Optimizer step
+                    logger.info("Optimizer step")
                     self.optimizer.step()
                     optimizer_was_run = not self.accelerator.optimizer_step_was_skipped
                     if optimizer_was_run:
@@ -685,6 +706,7 @@ class LLaVATrainer(Trainer):
                 )
                 self.control.should_training_stop = True
 
+            logger.info("On epoch end")
             self.control = self.callback_handler.on_epoch_end(args, self.state, self.control)
             self._maybe_log_save_evaluate(tr_loss, model, trial, epoch, ignore_keys_for_eval)
 
