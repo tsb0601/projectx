@@ -549,13 +549,15 @@ class LLaVATrainer(Trainer):
         # Skip the first epochs_trained epochs to get the random state of the dataloader at the right point.
         if not args.ignore_data_skip:
             logger.info(f"Skipping the first {epochs_trained} epochs")
-            for epoch in range(epochs_trained):
+            for epoch in tqdm(range(epochs_trained), desc="Skipping epochs"):
+                logger.info("Getting dataloader")
                 sampler = get_dataloader_sampler(train_dataloader)
                 sampler_kinds = [RandomSampler]
                 if version.parse(accelerate_version) > version.parse("0.23.0"):
                     sampler_kinds.append(SeedableRandomSampler)
                 is_random_sampler = isinstance(sampler, tuple(sampler_kinds))
                 if not is_random_sampler:
+                    logger.info("Not a random sampler, skipping the dataloader")
                     # We just need to begin an iteration to create the randomization of the sampler.
                     for _ in train_dataloader:
                         break
@@ -566,7 +568,7 @@ class LLaVATrainer(Trainer):
                     _ = list(sampler)
 
         total_batched_samples = 0
-        for epoch in range(epochs_trained, num_train_epochs):
+        for epoch in tqdm(range(epochs_trained, num_train_epochs), desc="Epoch"):
             epoch_iterator = train_dataloader
             if hasattr(epoch_iterator, "set_epoch"):
                 epoch_iterator.set_epoch(epoch)
@@ -580,14 +582,17 @@ class LLaVATrainer(Trainer):
                 if len_dataloader is not None
                 else args.max_steps * args.gradient_accumulation_steps
             )
+            logger.info(f"Steps in epoch: {steps_in_epoch}. On epoch begin")
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
             if epoch == epochs_trained and resume_from_checkpoint is not None and steps_trained_in_current_epoch == 0:
+                logger.info(f"Resuming training from {resume_from_checkpoint}")
                 self._load_rng_state(resume_from_checkpoint)
 
             rng_to_sync = False
             steps_skipped = 0
             if steps_trained_in_current_epoch > 0:
+                logger.info(f"Skipping the first {steps_trained_in_current_epoch} steps in the first epoch")
                 epoch_iterator = skip_first_batches(epoch_iterator, steps_trained_in_current_epoch)
                 steps_skipped = steps_trained_in_current_epoch
                 steps_trained_in_current_epoch = 0
