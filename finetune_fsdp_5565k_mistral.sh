@@ -39,7 +39,7 @@ python llava/train/train_tpu.py \
     --report_to wandb \
     --run_name $CKPT_NAME \
     --fsdp "full_shard" \
-    --fsdp_config fsdp_config.json \
+    --fsdp_config fsdp_config_mistral.json \
     # --gcp_project "nyu-vision-lab" \
     # --gcs_output_dir "gs://us-central2-storage/cambrian/checkpoints/$CKPT_NAME"
 
