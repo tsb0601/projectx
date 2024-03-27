@@ -775,6 +775,7 @@ class LazySupervisedDataset(Dataset):
         self.data_path = data_path
         self.data_args = data_args
         self.length = self._get_length()
+        rank0_print(f"Initialized dataset with {self.length} samples from {data_path}... DataArgs: {data_args}")
 
     def _get_length(self):
         """Calculates the number of samples in the .jsonl file."""
@@ -999,6 +1000,7 @@ class LazySupervisedDataset(Dataset):
 #             data_dict['image'] = torch.zeros(3, crop_size['height'], crop_size['width'])
 #         return data_dict
 
+
 def prepare_multimodal_data(input_ids, labels, attention_mask, image_token_len=576, max_length=2048):
     input_ids_im_replaced = []
     labels_im_replaced = []
@@ -1130,7 +1132,7 @@ def make_supervised_data_module(tokenizer: transformers.PreTrainedTokenizer,
 
 def convert_to_bf16_except_llama(model):
     # Loop through all modules and their respective parameters
-    
+
     # Assuming model is your PyTorch model
     for name, param in model.named_parameters():
         # Check if 'model.layers' is not in the parameter name

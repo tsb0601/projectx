@@ -571,6 +571,7 @@ class LLaVATrainer(Trainer):
         for epoch in tqdm(range(epochs_trained, num_train_epochs), desc="Epoch"):
             epoch_iterator = train_dataloader
             if hasattr(epoch_iterator, "set_epoch"):
+                logger.info(f"Setting epoch to {epoch}")
                 epoch_iterator.set_epoch(epoch)
 
             # Reset the past mems state at the beginning of each epoch if necessary.
@@ -584,6 +585,7 @@ class LLaVATrainer(Trainer):
             )
             logger.info(f"Steps in epoch: {steps_in_epoch}. On epoch begin")
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
+            logger.info("END On epoch begin")
 
             if epoch == epochs_trained and resume_from_checkpoint is not None and steps_trained_in_current_epoch == 0:
                 logger.info(f"Resuming training from {resume_from_checkpoint}")
@@ -592,6 +594,7 @@ class LLaVATrainer(Trainer):
             rng_to_sync = False
             steps_skipped = 0
             if steps_trained_in_current_epoch > 0:
+                logger.info(f"Trained {steps_trained_in_current_epoch} steps in the current epoch.")
                 logger.info(f"Skipping the first {steps_trained_in_current_epoch} steps in the first epoch")
                 epoch_iterator = skip_first_batches(epoch_iterator, steps_trained_in_current_epoch)
                 steps_skipped = steps_trained_in_current_epoch
@@ -785,4 +788,3 @@ class LLaVATrainer(Trainer):
             self._deactivate_neftune(self.model)
 
         return TrainOutput(self.state.global_step, train_loss, metrics)
-
