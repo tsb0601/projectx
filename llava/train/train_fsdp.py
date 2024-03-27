@@ -1221,10 +1221,10 @@ def train(INDEX, attn_implementation=None):
             logger.error(f"training_args.fsdp_config: {training_args.fsdp_config}")
             if (
                 hasattr(training_args, 'fsdp_config') and
-                'fsdp_transformer_layer_cls_to_wrap' in training_args.fsdp_config.keys()
+                'transformer_layer_cls_to_wrap' in training_args.fsdp_config.keys()
             ):
                 logger.warning(f"Replacing training_args.fsdp_config.fsdp_transformer_layer_cls_to_wrap with MistralDecoderLayer. Previous value: {training_args.fsdp_config.fsdp_transformer_layer_cls_to_wrap}")
-                training_args.fsdp_config["fsdp_transformer_layer_cls_to_wrap"] = ["MistralDecoderLayer"]
+                training_args.fsdp_config["transformer_layer_cls_to_wrap"] = ["MistralDecoderLayer"]
 
             model = LlavaMistralForCausalLM.from_pretrained(
                 model_args.model_name_or_path,
