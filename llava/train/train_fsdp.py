@@ -1218,6 +1218,7 @@ def train(INDEX, attn_implementation=None):
             logger.warning(f"Vision tower, loading LlavaMistralForCausalLM: {model_args.model_name_or_path}")
 
             # replace training_args.fsdp_config.fsdp_transformer_layer_cls_to_wrap with MistralDecoderLayer
+            logger.error(f"training_args.fsdp_config: {training_args.fsdp_config}")
             if (
                 hasattr(training_args, 'fsdp_config') and
                 'fsdp_transformer_layer_cls_to_wrap' in training_args.fsdp_config
