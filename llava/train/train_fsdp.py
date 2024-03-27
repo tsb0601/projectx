@@ -1219,8 +1219,8 @@ def train(INDEX, attn_implementation=None):
 
             # replace training_args.fsdp_config.fsdp_transformer_layer_cls_to_wrap with MistralDecoderLayer
             if (
-                hasattr(training_args, 'fsdp_config') and training_args.fsdp_config and
-                hasattr(training_args.fsdp_config, 'fsdp_transformer_layer_cls_to_wrap') and training_args.fsdp_config.fsdp_transformer_layer_cls_to_wrap
+                hasattr(training_args, 'fsdp_config') and
+                hasattr(training_args.fsdp_config, 'fsdp_transformer_layer_cls_to_wrap')
             ):
                 logger.warning(f"Replacing training_args.fsdp_config.fsdp_transformer_layer_cls_to_wrap with MistralDecoderLayer. Previous value: {training_args.fsdp_config.fsdp_transformer_layer_cls_to_wrap}")
                 training_args.fsdp_config.fsdp_transformer_layer_cls_to_wrap = ["MistralDecoderLayer"]
