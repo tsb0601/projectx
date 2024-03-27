@@ -1169,15 +1169,14 @@ def train(INDEX, attn_implementation=None):
     # Forward
     def forward(self, hidden_states):
         input_dtype = hidden_states.dtype
-        #print("input dtype is:", input_dtype)
         hidden_states = hidden_states.to(torch.float32)
         variance = hidden_states.pow(2).mean(-1, keepdim=True)
         hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
         output = (self.weight * hidden_states).to(input_dtype)
-        #print("output dtype is", output.dtype)
         return output
 
     transformers.models.llama.modeling_llama.LlamaRMSNorm.forward = forward
+    transformers.models.mistral.modeling_mistral.MistralRMSNorm.forward = forward
 
     logger.info("I changed forward!")
 
