@@ -1246,7 +1246,7 @@ def train(INDEX, attn_implementation=None):
     if model_args.freeze_backbone:
         model.model.requires_grad_(False)
 
-    logger.info(f"Model loaded. Model config: {model.config}")
+    logger.info("Model loaded.")
 
     # # XLA wait for model to be loaded
     # logger.warning("XLA: Waiting for model to be loaded")
