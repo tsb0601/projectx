@@ -88,7 +88,13 @@ class LlavaMistralForCausalLM(MistralForCausalLM, LlavaMetaForCausalLM):
                 image_sizes
             )
 
-        return super().forward(
+        # Very Important for TorchXLA
+        #self.model.gradient_checkpointing = False
+
+        from torch_xla.utils.checkpoint import checkpoint
+        self.model._gradient_checkpointing_func = checkpoint
+
+        output = super().forward(
             input_ids=input_ids,
             attention_mask=attention_mask,
             position_ids=position_ids,
@@ -100,6 +106,8 @@ class LlavaMistralForCausalLM(MistralForCausalLM, LlavaMetaForCausalLM):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict
         )
+
+        return output
 
     @torch.no_grad()
     def generate(
