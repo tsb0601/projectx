@@ -594,7 +594,7 @@ class LLaVATrainer(Trainer):
                 rng_to_sync = True
 
             step = -1
-            for step, inputs in tqdm(enumerate(epoch_iterator), desc="Iteration")):
+            for step, inputs in tqdm(enumerate(epoch_iterator), desc="Iteration"):
                 total_batched_samples += 1
 
                 if self.args.include_num_input_tokens_seen:
