@@ -50,6 +50,7 @@ def rank0_print(*args):
 
 
 from packaging import version
+
 IS_TOKENIZER_GREATER_THAN_0_14 = version.parse(tokenizers.__version__) >= version.parse('0.14')
 
 
@@ -119,6 +120,7 @@ class TrainingArguments(transformers.TrainingArguments):
     """Can also set GCP_PROJECT environment variable."""
     gcs_output_dir: Optional[str] = field(default=None)
     """gs://<bucket>/<prefix>"""
+
 
 def maybe_zero_3(param, ignore_status=False, name=None):
     from deepspeed import zero
@@ -1051,6 +1053,7 @@ def prepare_multimodal_data(input_ids, labels, attention_mask, image_token_len=5
     new_position_ids = torch.stack(new_position_ids)
     return new_input_ids, new_labels, new_attention_mask, new_position_ids
 
+
 @dataclass
 class DataCollatorForSupervisedDataset(object):
     """Collate examples for supervised fine-tuning."""
@@ -1125,7 +1128,6 @@ def make_supervised_data_module(tokenizer: transformers.PreTrainedTokenizer,
                 data_collator=data_collator)
 
 
-
 def convert_to_bf16_except_llama(model):
     # Loop through all modules and their respective parameters
     
@@ -1146,7 +1148,7 @@ def convert_to_bf16_except_llama(model):
 
 @log_stdout
 def train(INDEX, attn_implementation=None):
-#def train(attn_implementation=None):
+    # def train(attn_implementation=None):
 
     global local_rank
 
