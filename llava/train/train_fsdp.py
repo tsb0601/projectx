@@ -31,7 +31,6 @@ import tokenizers
 from llava.constants import IGNORE_INDEX, IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
 from torch.utils.data import Dataset
 from llava.train.llava_trainer import LLaVATrainer
-from llava.train.gcloud_rsync_callback import GCloudRsyncCallback
 
 from llava import conversation as conversation_lib
 from llava.model import *
@@ -688,6 +687,7 @@ def preprocess_gemma(
         labels=targets,
     )
 
+
 def preprocess_plain(
     sources: Sequence[str],
     tokenizer: transformers.PreTrainedTokenizer,
@@ -1208,13 +1208,28 @@ def train(INDEX, attn_implementation=None):
                 **bnb_model_from_pretrained_args
             )
         else:
+            # model = LlavaLlamaForCausalLM.from_pretrained(
+            # 		model_args.model_name_or_path,
+            # 		cache_dir=training_args.cache_dir,
+            # 		torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
+            # 		**bnb_model_from_pretrained_args
+            # 	)
+            #from torch_xla.core.xla_model import broadcast_master_param
+
+            #if local_rank==0:
             logger.info(f"Vision tower, loading LlavaLlamaForCausalLM: {model_args.model_name_or_path}")
             model = LlavaLlamaForCausalLM.from_pretrained(
                 model_args.model_name_or_path,
                 cache_dir=training_args.cache_dir,
+                do_sample=True,
                 torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
                 **bnb_model_from_pretrained_args
             )
+            # else:
+            #   config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path)
+            #   #with torch.device("meta"):
+            #   model = LlavaLlamaForCausalLM(config, do_sample=True)
+            #broadcast_master_param(model)
     else:
         logger.info(f"No vision tower, loading pure language model: {model_args.model_name_or_path}")
         model = transformers.LlamaForCausalLM.from_pretrained(
@@ -1230,14 +1245,13 @@ def train(INDEX, attn_implementation=None):
     if model_args.freeze_backbone:
         model.model.requires_grad_(False)
 
-    logger.info(f"Model loaded. Model config: {model.config}")\
+    logger.info(f"Model loaded. Model config: {model.config}")
 
-    # XLA wait for model to be loaded\
-    logger.warning("XLA: Waiting for model to be loaded")
-    import torch_xla.core.xla_model as xm
-    xm.rendezvous('model_loaded')
-
-    logger.error("BREAKING HERE"); exit()
+    # # XLA wait for model to be loaded
+    # logger.warning("XLA: Waiting for model to be loaded")
+    # import torch_xla.core.xla_model as xm
+    # xm.rendezvous('model_loaded')
+    # logger.error("BREAKING HERE"); exit()
 
     if training_args.bits in [4, 8]:
         from peft import prepare_model_for_kbit_training
