@@ -1363,7 +1363,7 @@ def train(INDEX, attn_implementation=None):
         training_args.use_im_start_end = model_args.mm_use_im_start_end
         model.config.mm_use_im_patch_token = model_args.mm_use_im_patch_token
         model.initialize_vision_tokenizer(model_args, tokenizer=tokenizer)
-        logger.info(f"Vision modules initialized. Model config: {model.config}")
+        logger.info("Vision modules initialized.")
 
     if training_args.bits in [4, 8]:
         logger.info(f"Initializing model in {training_args.bits}bit")
