@@ -8,7 +8,7 @@ export CKPT_NAME="llava-v1.5-llama2-7b-finetune-5565k-bs512" &&
 python llava/train/train_tpu.py \
     --model_name_or_path /mnt/disks/storage/llm_ckpts/llama-2-7b-hf \
     --version v1 \
-    --data_path /mnt/disks/storage/data/finetune_data/5565kL.jsonl \
+    --data_path ./debug.jsonl \
     --image_folder /mnt/disks/storage/data/finetune_data \
     --vision_tower openai/clip-vit-large-patch14-336 \
     --mm_projector_type mlp2x_gelu \
