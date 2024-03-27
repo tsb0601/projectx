@@ -283,3 +283,4 @@ class LLaVATrainer(Trainer):
             # Good practice: save your training arguments together with the trained model
             torch.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
 
+    
