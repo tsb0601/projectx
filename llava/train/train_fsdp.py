@@ -1416,13 +1416,13 @@ def train(INDEX, attn_implementation=None):
     if training_args.bf16:
         model = model.to(dtype = torch.float32)
 
-    gcloud_callback = GCloudRsyncCallback(training_args.output_dir, training_args.gcs_output_dir, training_args.gcp_project)
+    # gcloud_callback = GCloudRsyncCallback(training_args.output_dir, training_args.gcs_output_dir, training_args.gcp_project)
 
     logger.info("Configuring trainer...")
     trainer = LLaVATrainer(model=model,
                         tokenizer=tokenizer,
                         args=training_args,
-                        callbacks=[gcloud_callback],
+                        # callbacks=[gcloud_callback],
                         **data_module)
 
     if list(pathlib.Path(training_args.output_dir).glob("checkpoint-*")):
