@@ -1216,6 +1216,15 @@ def train(INDEX, attn_implementation=None):
             )
         elif 'mistral' in model_args.model_name_or_path.lower():
             logger.warning(f"Vision tower, loading LlavaMistralForCausalLM: {model_args.model_name_or_path}")
+
+            # replace training_args.fsdp_config.fsdp_transformer_layer_cls_to_wrap with MistralDecoderLayer
+            if (
+                hasattr(training_args, 'fsdp_config') and training_args.fsdp_config and
+                hasattr(training_args.fsdp_config, 'fsdp_transformer_layer_cls_to_wrap') and training_args.fsdp_config.fsdp_transformer_layer_cls_to_wrap
+            ):
+                logger.warning(f"Replacing training_args.fsdp_config.fsdp_transformer_layer_cls_to_wrap with MistralDecoderLayer. Previous value: {training_args.fsdp_config.fsdp_transformer_layer_cls_to_wrap}")
+                training_args.fsdp_config.fsdp_transformer_layer_cls_to_wrap = ["MistralDecoderLayer"]
+
             model = LlavaMistralForCausalLM.from_pretrained(
                 model_args.model_name_or_path,
                 cache_dir=training_args.cache_dir,
