@@ -1066,8 +1066,8 @@ class DataCollatorForSupervisedDataset(object):
     """Collate examples for supervised fine-tuning."""
 
     tokenizer: transformers.PreTrainedTokenizer
-    image_token_len = 576
-    image_position = 35
+    image_token_len: int = 576
+    image_position: int = 35
 
     def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
         image_token_len = self.image_token_len
