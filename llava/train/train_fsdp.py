@@ -1208,7 +1208,148 @@ def patch_llama_reset_parameters():
     LlamaModel.reset_parameters = llama_model_reset_parameters
     LlamaForCausalLM.reset_parameters = llama_for_causal_lm_reset_parameters
     LlamaForSequenceClassification.reset_parameters = llama_for_sequence_classification_reset_parameters
+
+
+import torch_xla
+import os
+XLA_DISABLE_FUNCTIONALIZATION = bool(
+    os.environ.get('XLA_DISABLE_FUNCTIONALIZATION', False))
+
+
+
+@torch.no_grad()
+def _shard_parameters_(self, params_to_shard) -> None:
+    """
+    At initialization we wrap a module with full parameters and shard the
+    parameters in-place. Sharding is implemented by viewing each parameter
+    as a 1D Tensor and retaining only a single slice, where the slice size
+    is determined by the number of data parallel workers.
+
+    Wrapping modules with many small parameters (or with a very large data
+    parallel world size) will result in many small parameter shards and slow
+    performance. In this case it's better to set *``flatten_parameters``* to
+    ``True``, so that all of the small parameters in the module are combined
+    into a single contiguous Tensor and sharded once.
+
+    After this initial sharding is complete, the user can initialize a
+    ``torch.optim.Optimizer`` in the usual way, i.e.::
+
+    .. code-block:: python
+
+        optim = torch.optim.Adam(sharded_module.parameters(), lr=0.0001)
+
+    The optimizer will see only a single slice of parameters and will thus
+    allocate less memory for optimizer state, avoiding redundancy across
+    data parallel workers.
+
+    Note: this method is implemented in a different manner from
+    ``fairscale.nn.FullyShardedDataParallel``. Here we delete the original
+    module parameters and create new sharded parameter tensors (instead of
+    making sharded tensors an attribute of the original parameters). This
+    make it easier to handle things (e.g. freeing parameters) on XLA.
+    """
     
+    print("I actually use this to shard models!")
+    if len(params_to_shard) > 0:
+      # When freeing the full parameters, we point their internal XLATensor to this placeholder
+      # (so that the XLA compiler can reuse the memory storage).
+      self._dummy_data_placeholder = torch.zeros(
+          1, dtype=self.compute_dtype, device=self.xla_device)
+
+    # get the module names of each full parameter to shard
+    params_to_shard_set = set(params_to_shard)
+    assert len(params_to_shard_set) == len(params_to_shard), \
+        "params_to_shard should not have dups"
+    full_param_infos = []
+    shared_full_param_memo = {}
+    shared_full_param_infos = []
+    full_params = []
+    for module_name, m in self.named_modules():
+      for n, p in m.named_parameters(recurse=False):
+        if p.dtype != torch.float32:
+          #raise TypeError("only fp32 parameters are supported")
+          p.data = p.data.to(torch.float32)
+        if p in params_to_shard_set:
+          if p in shared_full_param_memo:
+            mname, shared_m, shared_n = shared_full_param_memo[p]
+            shared_full_param_infos.append(
+                (module_name, mname, m, n, shared_m, shared_n))
+          else:
+            shared_full_param_memo[p] = (module_name, m, n)
+            full_param_infos.append((module_name, m, n))
+            full_params.append(p)
+    assert len(full_params) == len(params_to_shard_set), \
+        f"there are parameters in params_to_shard not belonging to this module."
+    del shared_full_param_memo
+    self.full_params = full_params
+    self.full_param_infos = full_param_infos
+    self.shared_full_param_infos = shared_full_param_infos
+
+    # allocate and register new sharded parameters
+    self.sharded_params = []
+    for idx, (module_name, m, n) in enumerate(self.full_param_infos):
+      p = self.full_params[idx]
+      # print("rank and device are:", self.rank, p.device, "module name is", module_name, p.requires_grad)
+      # if self.rank == 0:
+      #   # Move the tensor to the XLA device if it's not already on XLA
+      #   # if p.device != self.xla_device:
+      #   #   p = p.to(self.xla_device)
+      #   p = self._broadcast(p, src=0)
+      # else:
+      #   # Create a placeholder tensor on the XLA device for other ranks
+      #   p = torch.empty_like(p, device="cpu", requires_grad=p.requires_grad)
+      #   # Receive the broadcasted full parameter from rank 0
+      #   p = self._broadcast(p, src=0)
+      # print("rank and device are:", self.rank, p.device, "module name is", module_name, p.requires_grad, "finished broadcast")
+
+      assert not hasattr(p, "_is_sharded")
+
+      shard_data = self._get_shard(p)
+      
+      if shard_data.device != self.xla_device:
+        # cast to XLA device if not already on XLA
+        shard_data = shard_data.to(self.xla_device)
+      p_shard = nn.Parameter(shard_data, requires_grad=p.requires_grad)
+      p_shard._is_sharded = True
+      p_shard._orig_size = p.size()
+      p_shard._orig_name = f"{module_name}.{n}"
+      p_shard._name = f"_fsdp_shard.{p_shard._orig_name}".replace(
+          ".", "_FSDP_SHARD_SEPARATOR_")
+      self.register_parameter(p_shard._name, p_shard)
+      self.sharded_params.append(p_shard)
+      if p.device != self.xla_device:
+        # cast to XLA device if not already on XLA
+        p = p.to(self.xla_device).requires_grad_(p.requires_grad)
+        # update p in full_params since id(p) changed after the casting
+        self.full_params[idx] = p
+      # Free the full parameter storage (here we free its internal XLATensor) but keep the tensor itself
+      # for auto-grad tracing (like `torch.autograd.Variable` before the tensor-variable merge).
+      if XLA_DISABLE_FUNCTIONALIZATION:
+        p.data = p.new_zeros(1)  # Old behavior before Functionalization.
+      else:
+        torch_xla._XLAC._replace_xla_tensor(p, p.new_zeros(1))
+      p._sharded_param = p_shard  # add a handle to the sharded parameter
+      p._has_full_param = False
+      # deregister the full parameter tensors from their modules (so that they won't
+      # appear in the FSDP model's `parameters()` or `named_parameters()` outputs;
+      # only the sharded parameters should appear in the FSDP model's `parameters()`)
+      assert n in m._parameters
+      m._parameters.pop(n)
+      object.__setattr__(m, n, p)
+
+    # also deregister the shared parameters
+    for _, _, m, n, shared_m, shared_n in self.shared_full_param_infos:
+      assert n in m._parameters
+      m._parameters.pop(n)
+      shared_p = getattr(shared_m, shared_n)
+      object.__setattr__(m, n, shared_p)
+
+    assert len(self.sharded_params) == len(self.full_params)
+    
+from torch_xla.distributed.fsdp import XlaFullyShardedDataParallel
+XlaFullyShardedDataParallel._shard_parameters_ = _shard_parameters_
+import re
+
 
 def train(INDEX, attn_implementation=None):
 #def train(attn_implementation=None):
@@ -1236,7 +1377,7 @@ def train(INDEX, attn_implementation=None):
 		return output
 
 	transformers.models.llama.modeling_llama.LlamaRMSNorm.forward = forward
-	patch_llama_reset_parameters()
+	#patch_llama_reset_parameters()
 	print("I changed forward!")
 
 
@@ -1275,28 +1416,45 @@ def train(INDEX, attn_implementation=None):
 				**bnb_model_from_pretrained_args
 			)
 		else:
-			# model = LlavaLlamaForCausalLM.from_pretrained(
-			# 		model_args.model_name_or_path,
-			# 		cache_dir=training_args.cache_dir,
-			# 		torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
-			# 		**bnb_model_from_pretrained_args
-			# 	)
+			# Assuming model_args.model_name_or_path is a string that includes the model size
+			model_name = model_args.model_name_or_path
+
+			# Regular expression to find the number of parameters in the model's name (assuming a convention like 'ModelName-30b')
+			match = re.search(r'(\d+)b', model_name)
+			num_parameters_billion = float(match.group(1)) if match else 0
+
+			# Determine if bfloat16 should be used based on the model's size
+			use_bfloat16 = training_args.bf16 or num_parameters_billion > 30
+
+			model = LlavaLlamaForCausalLM.from_pretrained(
+				model_name,
+				cache_dir=training_args.cache_dir,
+				torch_dtype=(torch.bfloat16 if use_bfloat16 else None),
+				**bnb_model_from_pretrained_args
+			)
+
+			model = LlavaLlamaForCausalLM.from_pretrained(
+					model_args.model_name_or_path,
+					cache_dir=training_args.cache_dir,
+					torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
+					**bnb_model_from_pretrained_args
+				)
 			#from torch_xla.core.xla_model import broadcast_master_param
 
 			#if local_rank==0:
-			if local_rank==0:
-					model = LlavaLlamaForCausalLM.from_pretrained(
-						model_args.model_name_or_path,
-						cache_dir=training_args.cache_dir,
-						torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
-						do_sample=True,
-						**bnb_model_from_pretrained_args
-					)
-			else:
-				with torch.device("meta"):
-					config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path, do_sample=True, cache_dir=training_args.cache_dir, **bnb_model_from_pretrained_args)
+			# if local_rank==0:
+			# 		model = LlavaLlamaForCausalLM.from_pretrained(
+			# 			model_args.model_name_or_path,
+			# 			cache_dir=training_args.cache_dir,
+			# 			torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
+			# 			do_sample=True,
+			# 			**bnb_model_from_pretrained_args
+			# 		)
+			# else:
+			# 	with torch.device("meta"):
+			# 		config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path, do_sample=True, cache_dir=training_args.cache_dir, **bnb_model_from_pretrained_args)
 
-					model = LlavaLlamaForCausalLM(config)
+			# 		model = LlavaLlamaForCausalLM(config)
 		
 			# else:
 			# 	config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path)
