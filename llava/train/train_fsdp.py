@@ -1249,7 +1249,7 @@ def _shard_parameters_(self, params_to_shard) -> None:
     make it easier to handle things (e.g. freeing parameters) on XLA.
     """
     
-    print("I actually use this to shard models!")
+    #print("I actually use this to shard models!")
     if len(params_to_shard) > 0:
       # When freeing the full parameters, we point their internal XLATensor to this placeholder
       # (so that the XLA compiler can reuse the memory storage).
@@ -1433,12 +1433,12 @@ def train(INDEX, attn_implementation=None):
 				**bnb_model_from_pretrained_args
 			)
 
-			model = LlavaLlamaForCausalLM.from_pretrained(
-					model_args.model_name_or_path,
-					cache_dir=training_args.cache_dir,
-					torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
-					**bnb_model_from_pretrained_args
-				)
+			# model = LlavaLlamaForCausalLM.from_pretrained(
+			# 		model_args.model_name_or_path,
+			# 		cache_dir=training_args.cache_dir,
+			# 		torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
+			# 		**bnb_model_from_pretrained_args
+			# 	)
 			#from torch_xla.core.xla_model import broadcast_master_param
 
 			#if local_rank==0:
