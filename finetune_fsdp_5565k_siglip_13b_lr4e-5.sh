@@ -10,6 +10,7 @@ python llava/train/train_tpu.py \
     --data_path /mnt/disks/storage/data/finetune_data/5565kL.jsonl \
     --image_folder /mnt/disks/storage/data/finetune_data \
     --vision_tower siglip/CLIP-ViT-SO400M-14-384 \
+    --image_token_len 729 \
     --mm_projector_type mlp2x_gelu \
     --mm_vision_select_layer -2 \
     --mm_use_im_start_end False \

@@ -81,6 +81,8 @@ class DataArguments:
     is_multimodal: bool = False
     image_folder: Optional[str] = field(default=None)
     image_aspect_ratio: str = 'square'
+    image_token_len: int = 576
+    image_position: int = 35
 
 
 @dataclass
@@ -1064,12 +1066,12 @@ class DataCollatorForSupervisedDataset(object):
     """Collate examples for supervised fine-tuning."""
 
     tokenizer: transformers.PreTrainedTokenizer
+    image_token_len = 576
+    image_position = 35
 
     def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
-
-        #image_token_len = 729
-        image_token_len = 576
-        image_position = 35
+        image_token_len = self.image_token_len
+        image_position = self.image_position
 
         input_ids, labels = tuple([instance[key] for instance in instances]
                                   for key in ("input_ids", "labels"))
@@ -1127,7 +1129,11 @@ def make_supervised_data_module(tokenizer: transformers.PreTrainedTokenizer,
     train_dataset = LazySupervisedDataset(tokenizer=tokenizer,
                                 data_path=data_args.data_path,
                                 data_args=data_args)
-    data_collator = DataCollatorForSupervisedDataset(tokenizer=tokenizer)
+    data_collator = DataCollatorForSupervisedDataset(
+        tokenizer=tokenizer,
+        image_token_len=data_args.image_token_len,
+        image_position=data_args.image_position
+    )
     return dict(train_dataset=train_dataset,
                 eval_dataset=None,
                 data_collator=data_collator)
