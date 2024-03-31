@@ -20,31 +20,31 @@ import torch.nn as nn
 from torch.nn import CrossEntropyLoss
 
 from transformers import AutoConfig, AutoModelForCausalLM, \
-                         MistralConfig, MistralModel, MistralForCausalLM
+                         MixtralConfig, MixtralModel, MixtralForCausalLM
 
 from transformers.modeling_outputs import CausalLMOutputWithPast
 from transformers.generation.utils import GenerateOutput
 
 from ..llava_arch import LlavaMetaModel, LlavaMetaForCausalLM
+ 
+ 
+class LlavaMixtralConfig(MixtralConfig):
+    model_type = "llava_mixtral"
 
 
-class LlavaMistralConfig(MistralConfig):
-    model_type = "llava_mistral"
+class LlavaMixtralModel(LlavaMetaModel, MixtralModel):
+    config_class = LlavaMixtralConfig
+
+    def __init__(self, config: MixtralConfig):
+        super(LlavaMixtralModel, self).__init__(config)
 
 
-class LlavaMistralModel(LlavaMetaModel, MistralModel):
-    config_class = LlavaMistralConfig
-
-    def __init__(self, config: MistralConfig):
-        super(LlavaMistralModel, self).__init__(config)
-
-
-class LlavaMistralForCausalLM(MistralForCausalLM, LlavaMetaForCausalLM):
-    config_class = LlavaMistralConfig
+class LlavaMixtralForCausalLM(MixtralForCausalLM, LlavaMetaForCausalLM):
+    config_class = LlavaMixtralConfig
 
     def __init__(self, config):
-        super(MistralForCausalLM, self).__init__(config)
-        self.model = LlavaMistralModel(config)
+        super(MixtralForCausalLM, self).__init__(config)
+        self.model = LlavaMixtralModel(config)
 
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
 
@@ -154,5 +154,5 @@ class LlavaMistralForCausalLM(MistralForCausalLM, LlavaMetaForCausalLM):
             inputs['image_sizes'] = image_sizes
         return inputs
 
-AutoConfig.register("llava_mistral", LlavaMistralConfig)
-AutoModelForCausalLM.register(LlavaMistralConfig, LlavaMistralForCausalLM)
+AutoConfig.register("llava_mixtral", LlavaMixtralConfig)
+AutoModelForCausalLM.register(LlavaMixtralConfig, LlavaMixtralForCausalLM)
