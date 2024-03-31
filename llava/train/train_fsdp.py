@@ -477,6 +477,8 @@ def preprocess_v1(
     sep = conv.sep + conv.roles[1] + ": "
     for conversation, target in zip(conversations, targets):
         print("tokenizer id is", tokenizer.pad_token_id)
+        print(target[:10])
+        print(target[-10:])
         total_len = int(target.ne(tokenizer.pad_token_id).sum())
 
         rounds = conversation.split(conv.sep2)
