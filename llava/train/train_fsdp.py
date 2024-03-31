@@ -476,6 +476,7 @@ def preprocess_v1(
     # Mask targets
     sep = conv.sep + conv.roles[1] + ": "
     for conversation, target in zip(conversations, targets):
+        print("tokenizer id is", tokenizer.pad_token_id)
         total_len = int(target.ne(tokenizer.pad_token_id).sum())
 
         rounds = conversation.split(conv.sep2)
@@ -1571,7 +1572,9 @@ def train(INDEX, attn_implementation=None):
             padding_side="right",
             use_fast = use_fast
         )
+        print("tokenizer is", tokenizer)
         tokenizer.pad_token_id = 0
+        print("tokenizer id is", tokenizer.pad_token_id)
 
     logger.info(f"Model Version: {model_args.version}")
     if model_args.version == "v0":
