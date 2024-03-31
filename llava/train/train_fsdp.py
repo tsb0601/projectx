@@ -1571,6 +1571,7 @@ def train(INDEX, attn_implementation=None):
             padding_side="right",
             use_fast = use_fast
         )
+        tokenizer.pad_token_id = 0
 
     logger.info(f"Model Version: {model_args.version}")
     if model_args.version == "v0":
