@@ -3,13 +3,14 @@
 export PJRT_DEVICE=TPU &&
 export XLA_USE_BF16=0 &&
 export WANDB_ENTITY=nyu-visionx && export WANDB_PROJECT=llava &&
-export CKPT_NAME="llava-v1.5-llama2-7b-finetune-5565k-bs512" &&
+export CKPT_NAME="llava-v1.5-vicuna-13b-finetune-5565k-bs512-lr4e-5" &&
 python llava/train/train_tpu.py \
-    --model_name_or_path /mnt/disks/storage/llm_ckpts/llama-2-7b-hf \
+    --model_name_or_path lmsys/vicuna-13b-v1.5 \
     --version v1 \
     --data_path /mnt/disks/storage/data/finetune_data/5565kL.jsonl \
     --image_folder /mnt/disks/storage/data/finetune_data \
-    --vision_tower openai/clip-vit-large-patch14-336 \
+    --vision_tower siglip/CLIP-ViT-SO400M-14-384 \
+    --image_token_len 729 \
     --mm_projector_type mlp2x_gelu \
     --mm_vision_select_layer -2 \
     --mm_use_im_start_end False \
@@ -26,7 +27,7 @@ python llava/train/train_tpu.py \
     --save_strategy "steps" \
     --save_steps 100000 \
     --save_total_limit 1 \
-    --learning_rate 2e-5 \
+    --learning_rate 4e-5 \
     --weight_decay 0. \
     --warmup_ratio 0.03 \
     --lr_scheduler_type "cosine" \
@@ -39,7 +40,5 @@ python llava/train/train_tpu.py \
     --report_to wandb \
     --run_name $CKPT_NAME \
     --fsdp "full_shard" \
-    --fsdp_config fsdp_config.json \
-    # --gcp_project "nyu-vision-lab" \
-    # --gcs_output_dir "gs://us-central2-storage/cambrian/checkpoints/$CKPT_NAME"
+    --fsdp_config fsdp_config.json
 

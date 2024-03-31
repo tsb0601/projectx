@@ -4,6 +4,7 @@ import torch.nn as nn
 
 from torch.utils.data import Sampler
 
+from tqdm import tqdm
 from transformers import Trainer
 from transformers.trainer import (
     is_sagemaker_mp_enabled,
@@ -261,9 +262,9 @@ class LLaVATrainer(Trainer):
         ckpt_path = f'{ckpt_prefix}_rank-{rank:08d}-of-{world_size:08d}.pth'
         state_dict = self.model.state_dict()
         cpu_state_dict = {
-        		key: value.cpu()
-        		for key, value in state_dict.items()
-        	}
+                key: value.cpu()
+                for key, value in state_dict.items()
+        }
         del state_dict
         ckpt = {
             'model': cpu_state_dict,
@@ -282,4 +283,3 @@ class LLaVATrainer(Trainer):
             TRAINING_ARGS_NAME = "training_args.bin"
             # Good practice: save your training arguments together with the trained model
             torch.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
-

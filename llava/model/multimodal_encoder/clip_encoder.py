@@ -128,7 +128,8 @@ class CLIPVisionTower(nn.Module):
                     image_forward_outs = self.vision_tower.forward_features(images.to(device=self.device, dtype=self.dtype))
                     #print(image_forward_outs.shape)
                     #print(image_forward_outs.shape)
-                    image_features = image_forward_outs[:, 1:]
+                    # image_features = image_forward_outs[:, 1:]
+                    image_features = image_forward_outs
 
 
         return image_features

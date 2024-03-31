@@ -1,6 +1,8 @@
 import transformers
+from ezcolorlog import log_stdout
 
 
+@log_stdout
 def load(model_name):
     print("transformers.LlamaForCausalLM")
     print(f"Loading LLM: {model_name}")
