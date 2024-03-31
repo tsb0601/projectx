@@ -1404,7 +1404,7 @@ def train(INDEX, attn_implementation=None):
 	
 	
 
-
+	use_fast=False
 	if model_args.vision_tower is not None:
 		if 'mpt' in model_args.model_name_or_path:
 			config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
@@ -1425,13 +1425,38 @@ def train(INDEX, attn_implementation=None):
 
 			# Determine if bfloat16 should be used based on the model's size
 			use_bfloat16 = training_args.bf16 or num_parameters_billion > 30
-
-			model = LlavaLlamaForCausalLM.from_pretrained(
-				model_name,
-				cache_dir=training_args.cache_dir,
-				torch_dtype=(torch.bfloat16 if use_bfloat16 else None),
-				**bnb_model_from_pretrained_args
-			)
+			if "mixtral" in model_name.lower():
+				model = LlavaMixtralForCausalLM.from_pretrained(
+					model_name,
+					cache_dir=training_args.cache_dir,
+					torch_dtype=torch.bfloat16,
+					**bnb_model_from_pretrained_args
+				)
+				transformers.models.mixtral.modeling_mixtral.MixtralRMSNorm.forward = forward
+			elif "c4ai" in model_name.lower():
+				model = LlavaCohereForCausalLM.from_pretrained(
+					model_name,
+					cache_dir=training_args.cache_dir,
+					torch_dtype=torch.bfloat16,
+					**bnb_model_from_pretrained_args
+				)
+				use_fast=True
+			
+			elif "mistral" in model_name.lower():
+				model = LlavaMistralForCausalLM.from_pretrained(
+					model_name,
+					cache_dir=training_args.cache_dir,
+					torch_dtype=torch.bfloat16,
+					**bnb_model_from_pretrained_args
+				)
+				transformers.models.mistral.modeling_mistral.MistralRMSNorm.forward = forward
+			else:
+				model = LlavaLlamaForCausalLM.from_pretrained(
+					model_name,
+					cache_dir=training_args.cache_dir,
+					torch_dtype=(torch.bfloat16 if use_bfloat16 else None),
+					**bnb_model_from_pretrained_args
+				)
 
 			# model = LlavaLlamaForCausalLM.from_pretrained(
 			# 		model_args.model_name_or_path,
@@ -1520,7 +1545,7 @@ def train(INDEX, attn_implementation=None):
 			cache_dir=training_args.cache_dir,
 			model_max_length=training_args.model_max_length,
 			padding_side="right",
-			use_fast=False,
+			use_fast = use_fast
 		)
 
 	if model_args.version == "v0":
