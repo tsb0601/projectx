@@ -1283,21 +1283,21 @@ def _shard_parameters_(self, params_to_shard) -> None:
     shared_full_param_infos = []
     full_params = []
     for module_name, m in self.named_modules():
-        for n, p in m.named_parameters(recurse=False):
-            if p.dtype != torch.float32:
-            #raise TypeError("only fp32 parameters are supported")
-            p.data = p.data.to(torch.float32)
-            if p in params_to_shard_set:
-            if p in shared_full_param_memo:
-                mname, shared_m, shared_n = shared_full_param_memo[p]
-                shared_full_param_infos.append(
-                    (module_name, mname, m, n, shared_m, shared_n))
-            else:
-                shared_full_param_memo[p] = (module_name, m, n)
-                full_param_infos.append((module_name, m, n))
-                full_params.append(p)
+      for n, p in m.named_parameters(recurse=False):
+        if p.dtype != torch.float32:
+          #raise TypeError("only fp32 parameters are supported")
+          p.data = p.data.to(torch.float32)
+        if p in params_to_shard_set:
+          if p in shared_full_param_memo:
+            mname, shared_m, shared_n = shared_full_param_memo[p]
+            shared_full_param_infos.append(
+                (module_name, mname, m, n, shared_m, shared_n))
+          else:
+            shared_full_param_memo[p] = (module_name, m, n)
+            full_param_infos.append((module_name, m, n))
+            full_params.append(p)
     assert len(full_params) == len(params_to_shard_set), \
-        "there are parameters in params_to_shard not belonging to this module."
+        f"there are parameters in params_to_shard not belonging to this module."
     del shared_full_param_memo
     self.full_params = full_params
     self.full_param_infos = full_param_infos
