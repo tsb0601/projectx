@@ -1592,7 +1592,7 @@ def train(INDEX, attn_implementation=None):
             conversation_lib.default_conversation = conversation_lib.conv_templates[model_args.version]
         else:
             conversation_lib.default_conversation = conversation_lib.conv_templates["vicuna_v1"]
-
+    print("tokenizer id after operation is", tokenizer.pad_token_id)
     if model_args.vision_tower is not None:
         logger.info("Initializing vision modules...")
         model.get_model().initialize_vision_modules(
