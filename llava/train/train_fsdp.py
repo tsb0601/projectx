@@ -500,7 +500,7 @@ def preprocess_v1(
                 round_len = len(tokenizer(rou).input_ids)
                 instruction_len = len(tokenizer(parts[0]).input_ids) - 2
 
-            if i != 0 and not tokenizer.legacy and IS_TOKENIZER_GREATER_THAN_0_14:
+            if i != 0 and getattr(tokenizer, 'legacy', False) and IS_TOKENIZER_GREATER_THAN_0_14:
                 round_len -= 1
                 instruction_len -= 1
 
@@ -1424,7 +1424,7 @@ def train(INDEX, attn_implementation=None):
     else:
         logger.info(f"Loading model in full precision")
 
-    use_fast=False
+    use_cohere=False
     if model_args.vision_tower is not None:
         if 'mpt' in model_args.model_name_or_path:
             logger.warning(f"MPT model, loading LlavaMptForCausalLM: {model_args.model_name_or_path}")
@@ -1461,7 +1461,7 @@ def train(INDEX, attn_implementation=None):
                     torch_dtype=torch.bfloat16,
                     **bnb_model_from_pretrained_args
                 )
-                use_fast=True
+                use_cohere=True
             
             elif "mistral" in model_name.lower():
                 logger.warning(f"Vision tower, loading LlavaMistralForCausalLM: {model_args.model_name_or_path}")
@@ -1572,7 +1572,7 @@ def train(INDEX, attn_implementation=None):
             cache_dir=training_args.cache_dir,
             model_max_length=training_args.model_max_length,
             padding_side="right",
-            use_fast = use_fast
+            use_fast = use_cohere
         )
         print("tokenizer is", tokenizer)
         
@@ -1596,8 +1596,8 @@ def train(INDEX, attn_implementation=None):
         else:
             conversation_lib.default_conversation = conversation_lib.conv_templates["vicuna_v1"]
     
-    if use_fast:
-        tokenizer.pad_token_id = 0
+    if use_cohere:
+        tokenizer.pad_token_id = 1
         print("tokenizer id is", tokenizer.pad_token_id)
 
     if model_args.vision_tower is not None:
