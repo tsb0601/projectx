@@ -34,5 +34,5 @@ python llava/train/train_tpu.py \
     --lazy_preprocess True \
     --report_to wandb \
     --fsdp "full_shard" \
-    --fsdp_config fsdp_config.json
+    --fsdp_config fsdp_config_cohere.json
 
