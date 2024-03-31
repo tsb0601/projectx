@@ -477,8 +477,8 @@ def preprocess_v1(
     sep = conv.sep + conv.roles[1] + ": "
     for conversation, target in zip(conversations, targets):
         print("tokenizer id is", tokenizer.pad_token_id)
-        print(target[:10])
-        print(target[-10:])
+        #print(target[:10])
+        #print(target[-10:])
         total_len = int(target.ne(tokenizer.pad_token_id).sum())
 
         rounds = conversation.split(conv.sep2)
@@ -1575,9 +1575,7 @@ def train(INDEX, attn_implementation=None):
             use_fast = use_fast
         )
         print("tokenizer is", tokenizer)
-        if use_fast:
-            tokenizer.pad_token_id = 0
-        print("tokenizer id is", tokenizer.pad_token_id)
+        
     print("tokenizer id before operation is", tokenizer.pad_token_id)
 
 
@@ -1597,7 +1595,9 @@ def train(INDEX, attn_implementation=None):
             conversation_lib.default_conversation = conversation_lib.conv_templates[model_args.version]
         else:
             conversation_lib.default_conversation = conversation_lib.conv_templates["vicuna_v1"]
-    print("tokenizer id after operation is", tokenizer.pad_token_id)
+    if use_fast:
+            tokenizer.pad_token_id = 0
+        print("tokenizer id is", tokenizer.pad_token_id)
     if model_args.vision_tower is not None:
         logger.info("Initializing vision modules...")
         model.get_model().initialize_vision_modules(
