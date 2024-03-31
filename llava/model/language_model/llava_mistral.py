@@ -26,7 +26,7 @@ from transformers.modeling_outputs import CausalLMOutputWithPast
 from transformers.generation.utils import GenerateOutput
 
 from ..llava_arch import LlavaMetaModel, LlavaMetaForCausalLM
-
+ 
  
 class LlavaMixtralConfig(MixtralConfig):
     model_type = "llava_mixtral"
