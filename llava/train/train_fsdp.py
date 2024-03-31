@@ -1573,8 +1573,11 @@ def train(INDEX, attn_implementation=None):
             use_fast = use_fast
         )
         print("tokenizer is", tokenizer)
-        tokenizer.pad_token_id = 0
+        if use_fast:
+            tokenizer.pad_token_id = 0
         print("tokenizer id is", tokenizer.pad_token_id)
+    print("tokenizer id before operation is", tokenizer.pad_token_id)
+
 
     logger.info(f"Model Version: {model_args.version}")
     if model_args.version == "v0":
