@@ -832,10 +832,9 @@ def preprocess(
     if conversation_lib.default_conversation.sep_style == conversation_lib.SeparatorStyle.LLAMA_2:
         return preprocess_llama_2(sources, tokenizer, has_image=has_image)
     if conversation_lib.default_conversation.version.startswith("v1"):
-        if use_cohere:
-            return preprocess_cohere(sources, tokenizer, has_image=has_image)
-        else:
-            return preprocess_v1(sources, tokenizer, has_image=has_image)
+        return preprocess_v1(sources, tokenizer, has_image=has_image)
+    if conversation_lib.default_conversation.version.startswith("coherev1"):
+        return preprocess_cohere(sources, tokenizer, has_image=has_image)
     if conversation_lib.default_conversation.version == "mpt":
         return preprocess_mpt(sources, tokenizer, has_image=has_image)
     # add end signal and concatenate together
@@ -1520,7 +1519,6 @@ def train(INDEX, attn_implementation=None):
         ))
     else:
         logger.info(f"Loading model in full precision")
-    global use_cohere
     use_cohere=False
     if model_args.vision_tower is not None:
         if 'mpt' in model_args.model_name_or_path:

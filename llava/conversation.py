@@ -364,6 +364,18 @@ conv_llava_v1 = Conversation(
     sep2="</s>",
 )
 
+conv_llava_cohere = Conversation(
+    system="A chat between a curious human and an artificial intelligence assistant. "
+           "The assistant gives helpful, detailed, and polite answers to the human's questions.",
+    roles=("USER", "ASSISTANT"),
+    version="v1",
+    messages=(),
+    offset=0,
+    sep_style=SeparatorStyle.TWO,
+    sep=" ",
+    sep2="</s>",
+)
+
 conv_llava_v1_mmtag = Conversation(
     system="A chat between a curious user and an artificial intelligence assistant. "
            "The assistant is able to understand the visual content that the user provides, and assist the user with a variety of tasks using natural language."
@@ -405,11 +417,11 @@ conv_templates = {
     "v0": conv_vicuna_v0,
     "v1": conv_vicuna_v1,
     "vicuna_v1": conv_vicuna_v1,
+    "coherev1": conv_llava_cohere,
     "llama_2": conv_llama_2,
     "mistral_instruct": conv_mistral_instruct,
     "chatml_direct": conv_chatml_direct,
     "mistral_direct": conv_chatml_direct,
-
     "plain": conv_llava_plain,
     "v0_plain": conv_llava_plain,
     "llava_v0": conv_llava_v0,
@@ -417,9 +429,7 @@ conv_templates = {
     "llava_v1": conv_llava_v1,
     "v1_mmtag": conv_llava_v1_mmtag,
     "llava_llama_2": conv_llava_llama_2,
-
     "mpt": conv_mpt,
-
     "conv_gemma": conv_gemma
 }
 
