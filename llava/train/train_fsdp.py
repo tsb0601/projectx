@@ -593,7 +593,8 @@ def preprocess_v1(
             print("---------------")
             print("part 0 and sep", parts[0], sep)
             print("---------------")
-			parts[0] += sep
+            
+            parts[0] += sep
 
 
             if has_image:
