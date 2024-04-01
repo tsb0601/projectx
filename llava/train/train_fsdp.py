@@ -535,6 +535,7 @@ def preprocess_v1(
     conv = conversation_lib.default_conversation.copy()
     roles = {"human": conv.roles[0], "gpt": conv.roles[1]}
 
+    print("Using v1!!!")
     # Apply prompt templates
     conversations = []
     for i, source in enumerate(sources):
