@@ -602,10 +602,11 @@ def preprocess_v1(
             #     round_len -= 1
             #     instruction_len -= 1
             if i != 0 and not getattr(tokenizer, 'legacy', False) and IS_TOKENIZER_GREATER_THAN_0_14:
+                print("I am adding one")
                 round_len += 1
                 instruction_len += 1
 
-            print(f"Round {i+1}: round_len = {round_len}, instruction_len = {instruction_len}")
+            print(f"Round {i+1}: rou length = {len(rou)}, sround_len = {round_len}, instruction_len = {instruction_len}")
 
             target[cur_len : cur_len + instruction_len] = IGNORE_INDEX
 
