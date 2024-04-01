@@ -441,7 +441,7 @@ def preprocess_cohere(
     conv = conversation_lib.default_conversation.copy()
     roles = {"human": conv.roles[0], "gpt": conv.roles[1]}
     
-	print("I am processing cohere way!!")
+    print("I am processing cohere way!!")
 
     # Apply prompt templates
     conversations = []
