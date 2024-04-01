@@ -1686,6 +1686,7 @@ def train(INDEX, attn_implementation=None):
         tokenizer.pad_token = tokenizer.unk_token
     else:
         tokenizer.pad_token = tokenizer.unk_token
+        print("Model version", model_args.version)
         if model_args.version in conversation_lib.conv_templates:
             conversation_lib.default_conversation = conversation_lib.conv_templates[model_args.version]
         else:

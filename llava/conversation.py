@@ -368,7 +368,7 @@ conv_llava_cohere = Conversation(
     system="A chat between a curious human and an artificial intelligence assistant. "
            "The assistant gives helpful, detailed, and polite answers to the human's questions.",
     roles=("USER", "ASSISTANT"),
-    version="v1",
+    version="coherev1",
     messages=(),
     offset=0,
     sep_style=SeparatorStyle.TWO,
