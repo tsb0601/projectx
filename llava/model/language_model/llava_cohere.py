@@ -47,7 +47,6 @@ class LlavaCohereForCausalLM(CohereForCausalLM, LlavaMetaForCausalLM):
         super(CohereForCausalLM, self).__init__(config)
         self.model = LlavaCohereModel(config)
 
-        self.model = CohereModel(config)
         self.vocab_size = config.vocab_size
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
         self.logit_scale = config.logit_scale
