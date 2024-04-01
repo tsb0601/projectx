@@ -1520,7 +1520,7 @@ def train(INDEX, attn_implementation=None):
         ))
     else:
         logger.info(f"Loading model in full precision")
-	global use_cohere
+    global use_cohere
     use_cohere=False
     if model_args.vision_tower is not None:
         if 'mpt' in model_args.model_name_or_path:
