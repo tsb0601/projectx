@@ -574,8 +574,8 @@ def preprocess_v1(
         #print(target[:10])
         #print(target[-10:])
         total_len = int(target.ne(tokenizer.pad_token_id).sum())
-		rank0_print("target vs total_len", len(target), total_len)
-		rank0_print(rounds)
+        rank0_print("target vs total_len", len(target), total_len)
+        rank0_print(rounds)
 
         rounds = conversation.split(conv.sep2)
         cur_len = 1
