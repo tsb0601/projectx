@@ -590,7 +590,9 @@ def preprocess_v1(
             parts = rou.split(sep)
             if len(parts) != 2:
                 break
-            print("part o and sep", parts[0], sep)
+            print("---------------")
+            print("part 0 and sep", parts[0], sep)
+            print("---------------")
 			parts[0] += sep
 
 
