@@ -536,6 +536,7 @@ def preprocess_v1(
     conv = conversation_lib.default_conversation.copy()
     roles = {"human": conv.roles[0], "gpt": conv.roles[1]}
 
+    print("Using v1!!!")
     # Apply prompt templates
     conversations = []
     for i, source in enumerate(sources):
@@ -570,12 +571,16 @@ def preprocess_v1(
     # Mask targets
     sep = conv.sep + conv.roles[1] + ": "
     for conversation, target in zip(conversations, targets):
-        #print("tokenizer id is", tokenizer.pad_token_id)
+        print("tokenizer id is", tokenizer.pad_token_id)
         #print(target[:10])
         #print(target[-10:])
         total_len = int(target.ne(tokenizer.pad_token_id).sum())
+        print("target vs total_len", len(target), total_len)
 
         rounds = conversation.split(conv.sep2)
+
+        print(rounds)
+
         cur_len = 1
         target[:cur_len] = IGNORE_INDEX
         for i, rou in enumerate(rounds):
@@ -594,9 +599,15 @@ def preprocess_v1(
                 round_len = len(tokenizer(rou).input_ids)
                 instruction_len = len(tokenizer(parts[0]).input_ids) - 2
 
+            # if i != 0 and not getattr(tokenizer, 'legacy', False) and IS_TOKENIZER_GREATER_THAN_0_14:
+            #     round_len -= 1
+            #     instruction_len -= 1
             if i != 0 and not getattr(tokenizer, 'legacy', False) and IS_TOKENIZER_GREATER_THAN_0_14:
-                round_len -= 1
-                instruction_len -= 1
+                print("I am adding one")
+                round_len += 1
+                instruction_len += 1
+
+            print(f"Round {i+1}: rou length = {len(rou)}, sround_len = {round_len}, instruction_len = {instruction_len}")
 
             target[cur_len : cur_len + instruction_len] = IGNORE_INDEX
 
@@ -828,6 +839,7 @@ def preprocess(
     3. Tokenize the concatenated conversation;
     4. Make a deepcopy as the target. Mask human words with IGNORE_INDEX.
     """
+    print("Cohere version is", conversation_lib.default_conversation.version)
     if conversation_lib.default_conversation.sep_style == conversation_lib.SeparatorStyle.PLAIN:
         return preprocess_plain(sources, tokenizer)
     if conversation_lib.default_conversation.sep_style == conversation_lib.SeparatorStyle.LLAMA_2:
@@ -1520,7 +1532,6 @@ def train(INDEX, attn_implementation=None):
         ))
     else:
         logger.info(f"Loading model in full precision")
-
     use_cohere=False
     if model_args.vision_tower is not None:
         if 'mpt' in model_args.model_name_or_path:
@@ -1689,6 +1700,7 @@ def train(INDEX, attn_implementation=None):
         tokenizer.pad_token = tokenizer.unk_token
     else:
         tokenizer.pad_token = tokenizer.unk_token
+        print("Model version", model_args.version)
         if model_args.version in conversation_lib.conv_templates:
             conversation_lib.default_conversation = conversation_lib.conv_templates[model_args.version]
         else:
