@@ -574,11 +574,11 @@ def preprocess_v1(
         #print(target[:10])
         #print(target[-10:])
         total_len = int(target.ne(tokenizer.pad_token_id).sum())
-        rank0_print("target vs total_len", len(target), total_len)
+        print("target vs total_len", len(target), total_len)
 
         rounds = conversation.split(conv.sep2)
 
-        rank0_print(rounds)
+        print(rounds)
 
         cur_len = 1
         target[:cur_len] = IGNORE_INDEX
