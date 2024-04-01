@@ -433,6 +433,7 @@ def preprocess_llama_2(
         labels=targets,
     )
 
+
 def preprocess_cohere(
     sources,
     tokenizer: transformers.PreTrainedTokenizer,
@@ -1688,7 +1689,8 @@ def train(INDEX, attn_implementation=None):
     print("tokenizer id before operation is", tokenizer.pad_token_id)
 
 
-    logger.info(f"Model Version: {model_args.version}")
+    logger.info(f"Model Conv Version: {model_args.version}")
+    logger.info(f"Default conversation version: {conversation_lib.default_conversation.version}")
     if model_args.version == "v0":
         if tokenizer.pad_token is None:
             smart_tokenizer_and_embedding_resize(
@@ -1704,8 +1706,11 @@ def train(INDEX, attn_implementation=None):
         if model_args.version in conversation_lib.conv_templates:
             conversation_lib.default_conversation = conversation_lib.conv_templates[model_args.version]
         else:
+            logger.warning(f"Conversation version {model_args.version} not found. Using default `vicuna_v1`")
             conversation_lib.default_conversation = conversation_lib.conv_templates["vicuna_v1"]
-    
+    logger.info(f"Default conversation version: {conversation_lib.default_conversation.version}")
+
+
     if use_cohere:
         tokenizer.pad_token_id = 1
         print("tokenizer id is", tokenizer.pad_token_id)
