@@ -591,7 +591,7 @@ def preprocess_v1(
             if len(parts) != 2:
                 break
             print("---------------")
-            print("part 0 and sep", parts[0], sep)
+            print("part 0 and sep, part1", parts[0], sep)
             print("---------------")
             
             parts[0] += sep
@@ -600,9 +600,15 @@ def preprocess_v1(
             if has_image:
                 round_len = len(tokenizer_image_token(rou, tokenizer))
                 instruction_len = len(tokenizer_image_token(parts[0], tokenizer)) - 2
+
+                print("tokenized id:", tokenizer_image_token(rou, tokenizer), tokenizer_image_token(parts[0], tokenizer))
+
+
             else:
                 round_len = len(tokenizer(rou).input_ids)
                 instruction_len = len(tokenizer(parts[0]).input_ids) - 2
+
+                print("tokenized id:", tokenizer(rou).input_ids, tokenizer(parts[0]).input_ids)
 
             if i != 0 and not getattr(tokenizer, 'legacy', False) and IS_TOKENIZER_GREATER_THAN_0_14:
                 round_len -= 1
