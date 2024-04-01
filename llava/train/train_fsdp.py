@@ -577,7 +577,7 @@ def preprocess_v1(
         #print(target[:10])
         #print(target[-10:])
         total_len = int(target.ne(tokenizer.pad_token_id).sum())
-        print("target vs total_len", len(target), total_len)
+        print("target before operation", target)
 
         rounds = conversation.split(conv.sep2)
 
@@ -625,6 +625,8 @@ def preprocess_v1(
             cur_len += round_len
         target[cur_len:] = IGNORE_INDEX
         #rank0_print("cur_len", cur_len, "total_len", total_len)
+        print("target before operation", target)
+
         print("---------------")
 
         if cur_len < tokenizer.model_max_length:
