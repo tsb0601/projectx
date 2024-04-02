@@ -33,6 +33,7 @@ from torch.utils.data import Dataset
 from llava.train.llava_trainer import LLaVATrainer
 
 from llava import conversation as conversation_lib
+
 from llava.model import *
 from llava.mm_utils import tokenizer_image_token
 from llava.train.gcloud_rsync_callback import GCloudRsyncCallback
@@ -1806,6 +1807,8 @@ def train(INDEX, attn_implementation=None):
     else:
         tokenizer.pad_token = tokenizer.unk_token
         if model_args.version in conversation_lib.conv_templates:
+            global conversation_lib
+
             print("I found the fyucking template!!!")
             conversation_lib.default_conversation = conversation_lib.conv_templates[model_args.version]
         else:
