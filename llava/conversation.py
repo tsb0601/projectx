@@ -373,7 +373,7 @@ conv_llava_cohere = Conversation(
     offset=0,
     sep_style=SeparatorStyle.TWO,
     sep=" ",
-    sep2="</s>",
+    sep2="<|END_OF_TURN_TOKEN|>",
 )
 
 conv_llava_v1_mmtag = Conversation(

@@ -571,17 +571,10 @@ def preprocess_v1(
     # Mask targets
     sep = conv.sep + conv.roles[1] + ": "
     for conversation, target in zip(conversations, targets):
-        print("---------------")
-
-        print("tokenizer id is", tokenizer.pad_token_id)
-        #print(target[:10])
-        #print(target[-10:])
+        
         total_len = int(target.ne(tokenizer.pad_token_id).sum())
-        print("target before operation", target)
 
         rounds = conversation.split(conv.sep2)
-
-        print(rounds)
 
         cur_len = 1
         target[:cur_len] = IGNORE_INDEX
@@ -592,24 +585,13 @@ def preprocess_v1(
             parts = rou.split(sep)
             if len(parts) != 2:
                 break
-            print("part 0 and sep, part1", parts[0], "|", sep, "|", parts[1])
-            
             parts[0] += sep
-
-
             if has_image:
                 round_len = len(tokenizer_image_token(rou, tokenizer))
                 instruction_len = len(tokenizer_image_token(parts[0], tokenizer))
-
-                print("has image tokenized id:", tokenizer_image_token(rou, tokenizer), tokenizer_image_token(parts[0], tokenizer))
-
-
             else:
                 round_len = len(tokenizer(rou).input_ids)
                 instruction_len = len(tokenizer(parts[0]).input_ids)
-
-                print("NO image tokenized id:", tokenizer(rou).input_ids, tokenizer(parts[0]).input_ids)
-
             if i != 0 and not getattr(tokenizer, 'legacy', False) and IS_TOKENIZER_GREATER_THAN_0_14:
                 round_len -= 1
                 instruction_len -= 1
@@ -618,18 +600,13 @@ def preprocess_v1(
             #     round_len += 1
             #     instruction_len += 1
 
-            print(f"Round {i+1}: round_len = {round_len}, instruction_len = {instruction_len}")
+            #print(f"Round {i+1}: round_len = {round_len}, instruction_len = {instruction_len}")
 
             target[cur_len : cur_len + instruction_len] = IGNORE_INDEX
 
             cur_len += round_len
-        print("target second last operation", target)
         target[cur_len:] = IGNORE_INDEX
-        #rank0_print("cur_len", cur_len, "total_len", total_len)
-        print("target after operation", target)
-
-        print("---------------")
-
+        
         if cur_len < tokenizer.model_max_length:
             if cur_len != total_len:
                 target[:] = IGNORE_INDEX
@@ -1808,7 +1785,7 @@ def train(INDEX, attn_implementation=None):
             padding_side="right",
             use_fast = use_cohere
         )
-        print("tokenizer is", tokenizer)
+        
         
     print("tokenizer id before operation is", tokenizer.pad_token_id)
 
@@ -1826,19 +1803,19 @@ def train(INDEX, attn_implementation=None):
         tokenizer.pad_token = tokenizer.unk_token
     else:
         tokenizer.pad_token = tokenizer.unk_token
-        print("Model version", model_args.version)
         if model_args.version in conversation_lib.conv_templates:
             conversation_lib.default_conversation = conversation_lib.conv_templates[model_args.version]
         else:
             logger.warning(f"Conversation version {model_args.version} not found. Using default `vicuna_v1`")
             conversation_lib.default_conversation = conversation_lib.conv_templates["vicuna_v1"]
     logger.info(f"Default conversation version: {conversation_lib.default_conversation.version}")
+    print("Finally, set to conversation_lib.default_conversation.version")
 
 
     if use_cohere:
-        tokenizer.pad_token_id = 1
+        tokenizer.pad_token_id = 0
         print("tokenizer id is", tokenizer.pad_token_id)
-
+	print("tokenizer is", tokenizer)
     if model_args.vision_tower is not None:
         logger.info("Initializing vision modules...")
         model.get_model().initialize_vision_modules(
