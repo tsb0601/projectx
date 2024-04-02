@@ -316,9 +316,9 @@ def _add_speaker_and_signal(header, source, get_conversation=True):
     for sentence in source:
         from_str = sentence["from"]
         if from_str.lower() == "human":
-            from_str = conversation_lib.default_conversation.roles[0]
+            from_str = conversation.roles[0]
         elif from_str.lower() == "gpt":
-            from_str = conversation_lib.default_conversation.roles[1]
+            from_str = conversation.roles[1]
         else:
             from_str = 'unknown'
         sentence["value"] = (BEGIN_SIGNAL + from_str + ": " +
@@ -343,7 +343,7 @@ def preprocess_multimodal(
                 sentence['value'] = sentence['value'].replace(DEFAULT_IMAGE_TOKEN, '').strip()
                 sentence['value'] = DEFAULT_IMAGE_TOKEN + '\n' + sentence['value']
                 sentence['value'] = sentence['value'].strip()
-                if "mmtag" in conversation_lib.default_conversation.version:
+                if "mmtag" in conversation.version:
                     sentence['value'] = sentence['value'].replace(DEFAULT_IMAGE_TOKEN, '<Image>' + DEFAULT_IMAGE_TOKEN + '</Image>')
             replace_token = DEFAULT_IMAGE_TOKEN
             if data_args.mm_use_im_start_end:
@@ -358,7 +358,7 @@ def preprocess_llama_2(
     tokenizer: transformers.PreTrainedTokenizer,
     has_image: bool = False
 ) -> Dict:
-    conv = conversation_lib.default_conversation.copy()
+    conv = conversation.copy()
     roles = {"human": conv.roles[0], "gpt": conv.roles[1]}
 
     # Apply prompt templates
@@ -440,7 +440,7 @@ def preprocess_cohere(
     tokenizer: transformers.PreTrainedTokenizer,
     has_image: bool = False
 ) -> Dict:
-    conv = conversation_lib.default_conversation.copy()
+    conv = conversation.copy()
     roles = {"human": conv.roles[0], "gpt": conv.roles[1]}
     
     print("I am processing cohere way!!")
@@ -534,7 +534,7 @@ def preprocess_v1(
     tokenizer: transformers.PreTrainedTokenizer,
     has_image: bool = False
 ) -> Dict:
-    conv = conversation_lib.default_conversation.copy()
+    conv = conversation.copy()
     roles = {"human": conv.roles[0], "gpt": conv.roles[1]}
 
     #print("Using v1!!!")
@@ -627,7 +627,7 @@ def preprocess_v1_2(
     tokenizer: transformers.PreTrainedTokenizer,
     has_image: bool = False
 ) -> Dict:
-    conv = conversation_lib.default_conversation.copy()
+    conv = conversation.copy()
     roles = {"human": conv.roles[0], "gpt": conv.roles[1]}
 
     print("Using v1!!!")
@@ -739,7 +739,7 @@ def preprocess_mpt(
     tokenizer: transformers.PreTrainedTokenizer,
     has_image: bool = False
 ) -> Dict:
-    conv = conversation_lib.default_conversation.copy()
+    conv = conversation.copy()
     roles = {"human": conv.roles[0], "gpt": conv.roles[1]}
 
     # Apply prompt templates
@@ -826,7 +826,7 @@ def preprocess_gemma(
     tokenizer: transformers.PreTrainedTokenizer,
     has_image: bool = False
 ) -> Dict:
-    conv = conversation_lib.default_conversation.copy()
+    conv = conversation.copy()
     roles = {"human": conv.roles[0], "gpt": conv.roles[1]}
 
     # Apply prompt templates
@@ -919,7 +919,7 @@ def preprocess_plain(
         assert len(source) == 2
         assert DEFAULT_IMAGE_TOKEN in source[0]['value']
         source[0]['value'] = DEFAULT_IMAGE_TOKEN
-        conversation = source[0]['value'] + source[1]['value'] + conversation_lib.default_conversation.sep
+        conversation = source[0]['value'] + source[1]['value'] + conversation.sep
         conversations.append(conversation)
     # tokenize conversations
     input_ids = [tokenizer_image_token(prompt, tokenizer, return_tensors='pt') for prompt in conversations]
@@ -943,21 +943,21 @@ def preprocess(
     3. Tokenize the concatenated conversation;
     4. Make a deepcopy as the target. Mask human words with IGNORE_INDEX.
     """
-    print("Cohere version is", conversation_lib.default_conversation)
-    if conversation_lib.default_conversation.sep_style == conversation_lib.SeparatorStyle.PLAIN:
+    print("Cohere version is", conversation)
+    if conversation.sep_style == conversation_lib.SeparatorStyle.PLAIN:
         return preprocess_plain(sources, tokenizer)
-    if conversation_lib.default_conversation.sep_style == conversation_lib.SeparatorStyle.LLAMA_2:
+    if conversation.sep_style == conversation_lib.SeparatorStyle.LLAMA_2:
         return preprocess_llama_2(sources, tokenizer, has_image=has_image)
-    if conversation_lib.default_conversation.version.startswith("v1"):
+    if conversation.version.startswith("v1"):
         return preprocess_v1(sources, tokenizer, has_image=has_image)
-    if conversation_lib.default_conversation.version.startswith("coherev1"):
+    if conversation.version.startswith("coherev1"):
         return preprocess_cohere(sources, tokenizer, has_image=has_image)
-    if conversation_lib.default_conversation.version == "mpt":
+    if conversation.version == "mpt":
         return preprocess_mpt(sources, tokenizer, has_image=has_image)
     # add end signal and concatenate together
     conversations = []
     for source in sources:
-        header = f"{conversation_lib.default_conversation.system}\n\n"
+        header = f"{conversation.system}\n\n"
         conversation = _add_speaker_and_signal(header, source)
         conversations.append(conversation)
     # tokenize conversations
@@ -1792,9 +1792,10 @@ def train(INDEX, attn_implementation=None):
 
 
     logger.info(f"Model Conv Version: {model_args.version}")
-    logger.info(f"Default conversation version: {conversation_lib.default_conversation.version}")
-    
-    print("At first is", conversation_lib.default_conversation)
+    logger.info(f"Default conversation version: {conversation.version}")
+    global conversation 
+    conversation = conversation
+    print("At first is", conversation)
     if model_args.version == "v0":
         if tokenizer.pad_token is None:
             smart_tokenizer_and_embedding_resize(
@@ -1807,16 +1808,13 @@ def train(INDEX, attn_implementation=None):
     else:
         tokenizer.pad_token = tokenizer.unk_token
         if model_args.version in conversation_lib.conv_templates:
-            global conversation_lib
-
-            print("I found the fyucking template!!!")
-            conversation_lib.default_conversation = conversation_lib.conv_templates[model_args.version]
+            conversation = conversation_lib.conv_templates[model_args.version]
         else:
             logger.warning(f"Conversation version {model_args.version} not found. Using default `vicuna_v1`")
-            conversation_lib.default_conversation = conversation_lib.conv_templates["vicuna_v1"]
-    logger.info(f"Default conversation version: {conversation_lib.default_conversation.version}")
+            conversation = conversation_lib.conv_templates["vicuna_v1"]
+    logger.info(f"Default conversation version: {conversation.version}")
     
-    print("Then it is", conversation_lib.default_conversation)
+    print("Then it is", conversation)
 
 
     if use_cohere:
