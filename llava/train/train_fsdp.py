@@ -536,7 +536,7 @@ def preprocess_v1(
     conv = conversation_lib.default_conversation.copy()
     roles = {"human": conv.roles[0], "gpt": conv.roles[1]}
 
-    print("Using v1!!!")
+    #print("Using v1!!!")
     # Apply prompt templates
     conversations = []
     for i, source in enumerate(sources):
@@ -942,7 +942,7 @@ def preprocess(
     3. Tokenize the concatenated conversation;
     4. Make a deepcopy as the target. Mask human words with IGNORE_INDEX.
     """
-    print("Cohere version is", conversation_lib.default_conversation.version)
+    print("Cohere version is", conversation_lib.default_conversation)
     if conversation_lib.default_conversation.sep_style == conversation_lib.SeparatorStyle.PLAIN:
         return preprocess_plain(sources, tokenizer)
     if conversation_lib.default_conversation.sep_style == conversation_lib.SeparatorStyle.LLAMA_2:
