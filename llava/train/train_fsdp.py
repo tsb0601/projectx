@@ -1792,6 +1792,8 @@ def train(INDEX, attn_implementation=None):
 
     logger.info(f"Model Conv Version: {model_args.version}")
     logger.info(f"Default conversation version: {conversation_lib.default_conversation.version}")
+    
+    print("At first is", conversation_lib.default_conversation)
     if model_args.version == "v0":
         if tokenizer.pad_token is None:
             smart_tokenizer_and_embedding_resize(
@@ -1804,12 +1806,14 @@ def train(INDEX, attn_implementation=None):
     else:
         tokenizer.pad_token = tokenizer.unk_token
         if model_args.version in conversation_lib.conv_templates:
+            print("I found the fyucking template!!!")
             conversation_lib.default_conversation = conversation_lib.conv_templates[model_args.version]
         else:
             logger.warning(f"Conversation version {model_args.version} not found. Using default `vicuna_v1`")
             conversation_lib.default_conversation = conversation_lib.conv_templates["vicuna_v1"]
     logger.info(f"Default conversation version: {conversation_lib.default_conversation.version}")
-    print("Finally, set to conversation_lib.default_conversation.version")
+    
+    print("Then it is", conversation_lib.default_conversation)
 
 
     if use_cohere:
