@@ -504,9 +504,9 @@ def preprocess_cohere(
                 round_len = len(tokenizer(rou).input_ids)
                 instruction_len = len(tokenizer(parts[0]).input_ids) - 2
 
-            if i != 0 and not getattr(tokenizer, 'legacy', False) and IS_TOKENIZER_GREATER_THAN_0_14:
-                round_len -= 1
-                instruction_len -= 1
+            # if i != 0 and not getattr(tokenizer, 'legacy', False) and IS_TOKENIZER_GREATER_THAN_0_14:
+            #     round_len -= 1
+            #     instruction_len -= 1
 
             target[cur_len : cur_len + instruction_len] = IGNORE_INDEX
 
