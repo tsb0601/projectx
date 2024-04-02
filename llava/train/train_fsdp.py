@@ -518,7 +518,7 @@ def preprocess_cohere(
             if cur_len != total_len:
                 target[:] = IGNORE_INDEX
                 print(
-                    f"WARNING: tokenization mismatch: {cur_len} vs. {total_len}."
+                    f"WARNING: tokenization mismatch: {cur_len} vs. {total_len}. Length of round is {len(rounds)}."
                     f" (ignored)"
                 )
 
