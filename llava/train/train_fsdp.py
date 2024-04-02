@@ -482,7 +482,9 @@ def preprocess_cohere(
         #print("tokenizer id is", tokenizer.pad_token_id)
         #print(target[:10])
         #print(target[-10:])
+        
         total_len = int(target.ne(tokenizer.pad_token_id).sum())
+        print("Target, pad_token and length are", target, tokenizer.pad_token_id, total_len)
 
         rounds = conversation.split(conv.sep2)
         
