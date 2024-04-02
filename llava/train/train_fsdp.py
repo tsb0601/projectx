@@ -1793,7 +1793,6 @@ def train(INDEX, attn_implementation=None):
 
 
     logger.info(f"Model Conv Version: {model_args.version}")
-    logger.info(f"Default conversation version: {conversation.version}")
     
     conversation = conversation_lib.default_conversation
     print("At first is", conversation)
