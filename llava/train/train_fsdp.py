@@ -1184,6 +1184,7 @@ class DataCollatorForSupervisedDataset(object):
         max_length = self.tokenizer.model_max_length
 
         padding_side = self.tokenizer.padding_side 
+        print("Pad token id is", self.tokenizer.pad_token_id)
         if padding_side == "left":
             input_ids = [t[:max_length] if t.shape[0] >= max_length else torch.nn.functional.pad(t, (max_length - t.shape[0], 0), 'constant', self.tokenizer.pad_token_id) for t in input_ids]
             labels = [t[:max_length] if t.shape[0] >= max_length else torch.nn.functional.pad(t, ( max_length - t.shape[0], 0), 'constant', IGNORE_INDEX) for t in labels]
