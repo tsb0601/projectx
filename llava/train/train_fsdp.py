@@ -592,7 +592,7 @@ def preprocess_v1(
             parts = rou.split(sep)
             if len(parts) != 2:
                 break
-            print("part 0 and sep, part1", parts[0], sep)
+            print("part 0 and sep, part1", parts[0], "|", sep, "|", parts[1])
             
             parts[0] += sep
 
@@ -601,14 +601,14 @@ def preprocess_v1(
                 round_len = len(tokenizer_image_token(rou, tokenizer))
                 instruction_len = len(tokenizer_image_token(parts[0], tokenizer))
 
-                print("tokenized id:", tokenizer_image_token(rou, tokenizer), tokenizer_image_token(parts[0], tokenizer))
+                print("has image tokenized id:", tokenizer_image_token(rou, tokenizer), tokenizer_image_token(parts[0], tokenizer))
 
 
             else:
                 round_len = len(tokenizer(rou).input_ids)
                 instruction_len = len(tokenizer(parts[0]).input_ids)
 
-                print("tokenized id:", tokenizer(rou).input_ids, tokenizer(parts[0]).input_ids)
+                print("NO image tokenized id:", tokenizer(rou).input_ids, tokenizer(parts[0]).input_ids)
 
             if i != 0 and not getattr(tokenizer, 'legacy', False) and IS_TOKENIZER_GREATER_THAN_0_14:
                 round_len -= 1
@@ -618,14 +618,15 @@ def preprocess_v1(
             #     round_len += 1
             #     instruction_len += 1
 
-            print(f"Round {i+1}: rou length = {len(rou)}, sround_len = {round_len}, instruction_len = {instruction_len}")
+            print(f"Round {i+1}: round_len = {round_len}, instruction_len = {instruction_len}")
 
             target[cur_len : cur_len + instruction_len] = IGNORE_INDEX
 
             cur_len += round_len
+        print("target second last operation", target)
         target[cur_len:] = IGNORE_INDEX
         #rank0_print("cur_len", cur_len, "total_len", total_len)
-        print("target before operation", target)
+        print("target after operation", target)
 
         print("---------------")
 
