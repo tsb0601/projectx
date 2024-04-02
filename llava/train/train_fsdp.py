@@ -485,7 +485,6 @@ def preprocess_cohere(
         total_len = int(target.ne(tokenizer.pad_token_id).sum())
 
         rounds = conversation.split(conv.sep2)
-        rank0_print("rounds", rounds)
         
         cur_len = 1
         target[:cur_len] = IGNORE_INDEX
@@ -505,9 +504,9 @@ def preprocess_cohere(
                 round_len = len(tokenizer(rou).input_ids)
                 instruction_len = len(tokenizer(parts[0]).input_ids) - 2
 
-            if i != 0 and getattr(tokenizer, 'legacy', False) and IS_TOKENIZER_GREATER_THAN_0_14:
-                round_len += 1
-                instruction_len += 1
+            if i != 0 and not getattr(tokenizer, 'legacy', False) and IS_TOKENIZER_GREATER_THAN_0_14:
+                round_len -= 1
+                instruction_len -= 1
 
             target[cur_len : cur_len + instruction_len] = IGNORE_INDEX
 
@@ -1793,6 +1792,7 @@ def train(INDEX, attn_implementation=None):
 
     logger.info(f"Model Conv Version: {model_args.version}")
     logger.info(f"Default conversation version: {conversation_lib.default_conversation.version}")
+
     print("At first is", conversation_lib.default_conversation)
     if model_args.version == "v0":
         if tokenizer.pad_token is None:
