@@ -49,6 +49,7 @@ logger.setLevel(logging.WARNING)
 
 local_rank = None
 
+global conversation 
 
 def rank0_print(*args):
     if local_rank == 0:
@@ -1793,8 +1794,8 @@ def train(INDEX, attn_implementation=None):
 
     logger.info(f"Model Conv Version: {model_args.version}")
     logger.info(f"Default conversation version: {conversation.version}")
-    global conversation 
-    conversation = conversation
+    
+    conversation = conversation_lib.default_conversation
     print("At first is", conversation)
     if model_args.version == "v0":
         if tokenizer.pad_token is None:
