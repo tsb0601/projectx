@@ -1815,7 +1815,7 @@ def train(INDEX, attn_implementation=None):
     if use_cohere:
         tokenizer.pad_token_id = 0
         print("tokenizer id is", tokenizer.pad_token_id)
-	print("tokenizer is", tokenizer)
+    print("tokenizer is", tokenizer)
     if model_args.vision_tower is not None:
         logger.info("Initializing vision modules...")
         model.get_model().initialize_vision_modules(
