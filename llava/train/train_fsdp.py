@@ -1165,7 +1165,7 @@ class DataCollatorForSupervisedDataset(object):
     """Collate examples for supervised fine-tuning."""
 
     tokenizer: transformers.PreTrainedTokenizer
-    image_token_len: int = 576
+    image_token_len: int = 576  # 24x24
     image_position: int = 35
 
     def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
@@ -1584,7 +1584,7 @@ def train(INDEX, attn_implementation=None):
                     model_args.model_name_or_path,
                     cache_dir=training_args.cache_dir,
                     do_sample=True,
-                torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
+                    torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
                     **bnb_model_from_pretrained_args
                 )
 
