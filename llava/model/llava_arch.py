@@ -24,6 +24,7 @@ from .multimodal_projector.builder import build_vision_projector
 from llava.constants import IGNORE_INDEX, IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_PATCH_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
 
 from llava.mm_utils import get_anyres_image_grid_shape
+import torch.nn.functional as F
 
 
 class LlavaMetaModel:
@@ -136,8 +137,8 @@ class LlavaMetaForCausalLM(ABC):
 	def get_vision_tower(self):
 		return self.get_model().get_vision_tower()
 
-	def encode_images(self, images):
-		image_features = self.get_model().get_vision_tower()(images)
+	def encode_images(self, images, languages = None):
+		image_features = self.get_model().get_vision_tower()(images, languages=languages)
 		image_features = self.get_model().mm_projector(image_features).to(images.dtype)
 		return image_features
 
@@ -149,6 +150,51 @@ class LlavaMetaForCausalLM(ABC):
 		vision_tower = self.get_vision_tower()
 		if vision_tower is None or images is None or input_ids.shape[1] == 1:
 			return input_ids, position_ids, attention_mask, past_key_values, None, labels
+
+		
+		# embed the input_ids
+		new_input_ids_padded_for_emb = torch.where(input_ids==IMAGE_TOKEN_INDEX, 0, input_ids)
+		input_embeds = self.get_model().embed_tokens(new_input_ids_padded_for_emb)
+		
+		mask = (labels == -100) & (attention_mask) & (input_ids!=0) & (input_ids!=IMAGE_TOKEN_INDEX)
+		mask[:, :35] = False 
+		non_zero_counts = mask.sum(dim=1)
+
+		#print("Count of instruction entries in the mask for each sample:", non_zero_counts)
+
+		mask_expanded = mask.unsqueeze(-1).float()  # Adds an embedding_dim axis with size 1
+
+		# Multiply input_embeds by the expanded mask to zero out unwanted embeddings
+		filtered_input_embeds = input_embeds * mask_expanded
+
+		# Placeholder values for demonstration
+		number_of_text_tokens = 144  # The target number of tokens
+		embedding_dim = filtered_input_embeds.size(2)  # Assuming the last dimension is embedding size
+
+		# Compute the number of non-zero embeddings per sequence
+		non_zero_counts = mask.sum(dim=1)
+
+		# Initialize a tensor to hold the output
+		language_embeds = torch.zeros((filtered_input_embeds.size(0), number_of_text_tokens, embedding_dim),
+									device=filtered_input_embeds.device, dtype=filtered_input_embeds.dtype)
+
+		# Loop over batches to truncate or pad
+		# Note: This approach assumes compacting is necessary and uses a loop due to per-sequence operations.
+		for i, (embeds, count) in enumerate(zip(filtered_input_embeds, non_zero_counts)):
+			# Determine the end index for copying embeddings, limited by the target number or actual non-zero count
+			end_idx = min(count.item(), number_of_text_tokens)
+			if end_idx > 0:
+				# Copy the embeddings up to end_idx
+				language_embeds[i, :end_idx] = embeds[mask[i]][:end_idx]
+
+		#print("input embed shape is", input_embeds.shape)
+		#print("labels shape is", labels.shape)
+		#print("attention mask shape is", attention_mask.shape)
+		#print("language embed shape is", language_embeds.shape)
+
+		########################
+		### embed the images ###
+		########################
 
 		if type(images) is list or images.ndim == 5:
 			if type(images) is list:
@@ -199,16 +245,15 @@ class LlavaMetaForCausalLM(ABC):
 			else:
 				raise ValueError(f"Unexpected mm_patch_merge_type: {self.config.mm_patch_merge_type}")
 		else:
-			image_features = self.encode_images(images)
+			image_features = self.encode_images(images, languages=language_embeds)
 
 		# TODO: image start / end is not implemented here to support pretraining.
 		if getattr(self.config, 'tune_mm_mlp_adapter', False) and getattr(self.config, 'mm_use_im_start_end', False):
 			raise NotImplementedError
 		
 		
-		# embed the input_ids
-		new_input_ids_padded_for_emb = torch.where(input_ids==IMAGE_TOKEN_INDEX, 0, input_ids)
-		input_embeds = self.get_model().embed_tokens(new_input_ids_padded_for_emb)
+
+
 
 		new_input_embeds = []
 		cur_image_idx = 0

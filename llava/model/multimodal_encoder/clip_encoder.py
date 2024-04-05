@@ -4,6 +4,113 @@ import torch.nn as nn
 from transformers import CLIPVisionModel, CLIPImageProcessor, CLIPVisionConfig
 from open_clip import create_model_from_pretrained, get_tokenizer 
 
+
+
+
+from einops import rearrange, repeat
+
+def FeedForward(dim, mult = 4):
+    inner_dim = int(dim * mult)
+    return nn.Sequential(
+        nn.LayerNorm(dim),
+        nn.Linear(dim, inner_dim, bias = False),
+        nn.GELU(),
+        nn.Linear(inner_dim, dim, bias = False)
+    )
+
+class PerceiverAttention(nn.Module):
+    def __init__(
+        self,
+        *,
+        dim,
+        dim_head = 64,
+        heads = 8
+    ):
+        super().__init__()
+        self.scale = dim_head ** -0.5
+        self.heads = heads
+        inner_dim = dim_head * heads
+        
+        self.norm_media = nn.LayerNorm(dim)
+        self.norm_latents = nn.LayerNorm(dim)
+        
+        self.to_q = nn.Linear(dim, inner_dim, bias = False)
+        self.to_kv = nn.Linear(dim, inner_dim * 2, bias = False)
+        self.to_out = nn.Linear(inner_dim, dim, bias = False)
+
+    def forward(self, x, latents):
+        x = self.norm_media(x)
+        latents = self.norm_latents(latents)
+        
+        b, h = x.shape[0], self.heads
+        
+        q = self.to_q(latents)
+        kv_input = torch.cat((x, latents), dim = -2)
+        k, v = self.to_kv(kv_input).chunk(2, dim = -1)
+        
+        q, k, v = rearrange(q, 'b n (h d) -> b h n d', h = h), rearrange(k, 'b n (h d) -> b h n d', h = h), rearrange(v, 'b n (h d) -> b h n d', h = h)
+        q = q * self.scale
+        
+        sim = torch.einsum('bhid,bhjd->bhij', q, k)
+        sim = sim - sim.amax(dim = -1, keepdim = True).detach()
+        attn = sim.softmax(dim = -1)
+        
+        out = torch.einsum('bhij,bhjd->bhid', attn, v)
+        out = rearrange(out, 'b h n d -> b n (h d)')
+        
+        return self.to_out(out)
+
+class PerceiverResampler(nn.Module):
+    def __init__(
+        self,
+        *,
+        dim = 1024,
+        depth = 2,
+        dim_head = 96,
+        heads = 8,
+        num_latents = 144,
+        ff_mult = 4,
+        language_token_dim = 4096
+    ):
+        super().__init__()
+        self.latents = nn.Parameter(torch.randn(num_latents, dim))
+        self.media_pos_emb = nn.Parameter(torch.randn(1, dim))
+        self.language_cross_attn = nn.MultiheadAttention(dim, heads)
+        
+        self.layers = nn.ModuleList([])
+        for _ in range(depth):
+            self.layers.append(nn.ModuleList([
+                PerceiverAttention(dim = dim, dim_head = dim_head, heads = heads),
+                FeedForward(dim = dim, mult = ff_mult)
+            ]))
+        
+        self.norm = nn.LayerNorm(dim)
+        self.language_proj = nn.Linear(language_token_dim, dim)
+
+    def forward(self, x, language_tokens):
+        if x.ndim == 2:
+            x = rearrange(x, 'b d -> b 1 d')
+        print("x.shape", x.shape)
+        print("mdeia_pos_emb.shape", self.media_pos_emb.shape)
+        x = x + self.media_pos_emb
+        latents = repeat(self.latents, 'n d -> b n d', b = x.shape[0])
+        
+        language_tokens = self.language_proj(language_tokens)
+        
+        for attn, ff in self.layers:
+            latents = attn(x, latents) + latents
+            print("latents.shape", latents.shape)
+            print("language_tokens.shape", language_tokens.shape)
+            latents = self.language_cross_attn(latents, language_tokens, language_tokens)[0] + latents
+            latents = ff(latents) + latents
+        
+        return self.norm(latents)
+    
+
+
+
+
+
 class ProcessorWrapper:
     def __init__(self, transform, height=378, width=378):
         self._crop_size = {
@@ -33,6 +140,9 @@ class CLIPVisionTower(nn.Module):
         self.is_loaded = False
 
         self.vision_tower_name = vision_tower
+
+        self.resampler = PerceiverResampler()
+
         self.select_layer = args.mm_vision_select_layer
         self.select_feature = getattr(args, 'mm_vision_select_feature', 'patch')
         
@@ -96,7 +206,7 @@ class CLIPVisionTower(nn.Module):
         return image_features
 
     @torch.no_grad()
-    def forward(self, images):
+    def forward_features(self, images):
         
         # Very Important for TorchXLA
         #self.vision_tower.vision_model.encoder.gradient_checkpointing = False
@@ -104,8 +214,6 @@ class CLIPVisionTower(nn.Module):
         if self.vision_model == "oai-clip":
             from torch_xla.utils.checkpoint import checkpoint
             self.vision_tower.vision_model.encoder._gradient_checkpointing_func = checkpoint 
-        
-        
 
         if type(images) is list:
             image_features = []
@@ -130,9 +238,20 @@ class CLIPVisionTower(nn.Module):
                     #print(image_forward_outs.shape)
                     # image_features = image_forward_outs[:, 1:]
                     image_features = image_forward_outs
-
-
         return image_features
+    
+
+    def forward(self, images, languages = None):
+        image_features = self.forward_features(images)
+        if languages is not None:
+            image_features = self.resampler(image_features, languages)
+
+        print("output shape", image_features.shape)
+        return image_features
+        
+       
+    
+    
 
     @property
     def dummy_feature(self):
