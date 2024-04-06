@@ -430,9 +430,19 @@ Answer the questions.""",
     sep="<|im_end|>",
 )
 
+conv_chatml_direct_ft = Conversation(
+    system="""<|im_start|>system\nAnswer the questions.""",
+    roles=("<|im_start|>user\n", "<|im_start|>assistant\n"),
+    version="mpt",
+    messages=(),
+    offset=0,
+    sep_style=SeparatorStyle.MPT,
+    sep="<|im_end|>",
+)
+
 #default_conversation = conv_llava_cohere
 #default_conversation = conv_vicuna_v1
-default_conversation = conv_chatml_direct
+default_conversation = chatml_direct_ft
 
 conv_templates = {
     "default": conv_vicuna_v0,
@@ -443,6 +453,7 @@ conv_templates = {
     "llama_2": conv_llama_2,
     "mistral_instruct": conv_mistral_instruct,
     "chatml_direct": conv_chatml_direct,
+    "chatml_direct_ft": conv_chatml_direct_ft,
     "mistral_direct": conv_chatml_direct,
     "plain": conv_llava_plain,
     "v0_plain": conv_llava_plain,

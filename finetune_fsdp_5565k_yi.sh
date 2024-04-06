@@ -2,7 +2,7 @@
 
 python llava/train/train_tpu.py \
     --model_name_or_path /mnt/disks/storage/llm_ckpts/Nous-Hermes-2-Yi-34B \
-    --version chatml_direct \
+    --version chatml_direct_ft \
     --data_path /mnt/disks/storage/data/finetune_data/5565kL.jsonl \
     --image_folder /mnt/disks/storage/data/finetune_data \
     --vision_tower openai/clip-vit-large-patch14-336 \
