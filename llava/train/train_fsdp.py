@@ -666,7 +666,7 @@ def preprocess_mpt(
         re_rounds = [conv.sep.join(rounds[:3])] # system + user + gpt
         for conv_idx in range(3, len(rounds), 2):
             re_rounds.append(conv.sep.join(rounds[conv_idx:conv_idx+2]))    # user + gpt
-        cur_len = 0
+        cur_len = 1
         target[:cur_len] = IGNORE_INDEX
         for i, rou in enumerate(re_rounds):
             if rou == "":
