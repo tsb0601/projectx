@@ -442,7 +442,7 @@ conv_chatml_direct_ft = Conversation(
 
 #default_conversation = conv_llava_cohere
 #default_conversation = conv_vicuna_v1
-default_conversation = chatml_direct_ft
+default_conversation = conv_chatml_direct_ft
 
 conv_templates = {
     "default": conv_vicuna_v0,
