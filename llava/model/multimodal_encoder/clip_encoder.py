@@ -141,7 +141,7 @@ class CLIPVisionTower(nn.Module):
 
         self.vision_tower_name = vision_tower
 
-        self.resampler = PerceiverResampler()
+        #self.resampler = PerceiverResampler()
 
         self.select_layer = args.mm_vision_select_layer
         self.select_feature = getattr(args, 'mm_vision_select_feature', 'patch')
