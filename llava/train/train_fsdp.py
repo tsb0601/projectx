@@ -1552,7 +1552,7 @@ def train(INDEX, attn_implementation=None):
             # Determine if bfloat16 should be used based on the model's size
             use_bfloat16 = training_args.bf16 or num_parameters_billion > 30
             if "yi" in model_name.lower():
-                use_bfloat16 = training_args.bf16
+                use_bfloat16 = True
             if "mixtral" in model_name.lower():
                 model = LlavaMixtralForCausalLM.from_pretrained(
                     model_name,
@@ -1595,7 +1595,7 @@ def train(INDEX, attn_implementation=None):
                     model_args.model_name_or_path,
                     cache_dir=training_args.cache_dir,
                     do_sample=True,
-                	torch_dtype=use_bfloat16,
+                	torch_dtype=(torch.bfloat16 if use_bfloat16 else None),
                     **bnb_model_from_pretrained_args
                 )
 
