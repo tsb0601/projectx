@@ -246,7 +246,7 @@ class CLIPVisionTower(nn.Module):
         if languages is not None:
             image_features = self.resampler(image_features, languages)
 
-        print("output shape", image_features.shape)
+        #print("output shape", image_features.shape)
         return image_features
         
        
