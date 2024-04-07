@@ -26,6 +26,147 @@ from llava.constants import IGNORE_INDEX, IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_PATCH
 from llava.mm_utils import get_anyres_image_grid_shape
 import torch.nn.functional as F
 
+from einops import rearrange, repeat
+
+def FeedForward(dim, mult = 4):
+	inner_dim = int(dim * mult)
+	return nn.Sequential(
+		nn.LayerNorm(dim),
+		nn.Linear(dim, inner_dim, bias = False),
+		nn.GELU(),
+		nn.Linear(inner_dim, dim, bias = False)
+	)
+
+class LanguageCrossAttention(nn.Module):
+    def __init__(self, *, dim, dim_head=64, heads=8):
+        super().__init__()
+        self.scale = dim_head ** -0.5
+        self.heads = heads
+        inner_dim = dim_head * heads
+        
+        self.norm_latents = nn.LayerNorm(dim)
+        self.norm_language = nn.LayerNorm(dim)
+        
+        self.to_q = nn.Linear(dim, inner_dim, bias=False)
+        self.to_kv = nn.Linear(dim, inner_dim * 2, bias=False)
+        self.to_out = nn.Linear(inner_dim, dim, bias=False)
+
+    def forward(self, latents, language_tokens):
+        latents = self.norm_latents(latents)
+        language_tokens = self.norm_language(language_tokens)
+        
+        b, h = latents.shape[0], self.heads
+        q = self.to_q(latents)
+        kv_input = language_tokens
+        k, v = self.to_kv(kv_input).chunk(2, dim=-1)
+        
+        q, k, v = rearrange(q, 'b n (h d) -> b h n d', h=h), rearrange(k, 'b n (h d) -> b h n d', h=h), rearrange(v, 'b n (h d) -> b h n d', h=h)
+        q = q * self.scale
+        
+        sim = torch.einsum('bhid,bhjd->bhij', q, k)
+        sim = sim - sim.amax(dim=-1, keepdim=True).detach()
+        attn = sim.softmax(dim=-1)
+        
+        out = torch.einsum('bhij,bhjd->bhid', attn, v)
+        out = rearrange(out, 'b h n d -> b n (h d)')
+        
+        return self.to_out(out)
+
+class PerceiverAttention(nn.Module):
+	def __init__(
+		self,
+		*,
+		dim,
+		dim_head = 64,
+		heads = 8
+	):
+		super().__init__()
+		self.scale = dim_head ** -0.5
+		self.heads = heads
+		inner_dim = dim_head * heads
+		
+		self.norm_media = nn.LayerNorm(dim)
+		self.norm_latents = nn.LayerNorm(dim)
+		
+		self.to_q = nn.Linear(dim, inner_dim, bias = False)
+		self.to_kv = nn.Linear(dim, inner_dim * 2, bias = False)
+		self.to_out = nn.Linear(inner_dim, dim, bias = False)
+
+	def forward(self, x, latents):
+		x = self.norm_media(x)
+		latents = self.norm_latents(latents)
+
+		#print("latents dtype", latents.dtype)
+		
+		b, h = x.shape[0], self.heads
+		
+		q = self.to_q(latents)
+		kv_input = torch.cat((x, latents), dim = -2)
+		k, v = self.to_kv(kv_input).chunk(2, dim = -1)
+		
+		q, k, v = rearrange(q, 'b n (h d) -> b h n d', h = h), rearrange(k, 'b n (h d) -> b h n d', h = h), rearrange(v, 'b n (h d) -> b h n d', h = h)
+		q = q * self.scale
+		
+		sim = torch.einsum('bhid,bhjd->bhij', q, k)
+		sim = sim - sim.amax(dim = -1, keepdim = True).detach()
+		attn = sim.softmax(dim = -1)
+		
+		out = torch.einsum('bhij,bhjd->bhid', attn, v)
+		out = rearrange(out, 'b h n d -> b n (h d)')
+		
+		return self.to_out(out)
+
+class PerceiverResampler(nn.Module):
+	def __init__(
+		self,
+		*,
+		dim = 1024,
+		depth = 2,
+		dim_head = 96,
+		heads = 8,
+		num_latents = 144,
+		ff_mult = 4,
+		language_token_dim = 4096
+	):
+		super().__init__()
+		self.latents = nn.Parameter(torch.randn(num_latents, dim))
+		self.media_pos_emb = nn.Parameter(torch.randn(1, dim))
+		self.language_cross_attn = LanguageCrossAttention(dim=dim, dim_head=dim_head, heads=heads)
+		
+		self.layers = nn.ModuleList([])
+		for _ in range(depth):
+			self.layers.append(nn.ModuleList([
+				PerceiverAttention(dim = dim, dim_head = dim_head, heads = heads),
+				FeedForward(dim = dim, mult = ff_mult)
+			]))
+		
+		self.norm = nn.LayerNorm(dim)
+		self.language_proj = nn.Linear(language_token_dim, dim)
+		# self.dtype = dtype
+		# self.device = device
+
+	def forward(self, x, language_tokens):
+		if x.ndim == 2:
+			x = rearrange(x, 'b d -> b 1 d')
+
+		x = x + self.media_pos_emb
+		latents = repeat(self.latents, 'n d -> b n d', b = x.shape[0])
+
+		language_tokens = self.language_proj(language_tokens)
+		
+		for attn, ff in self.layers:
+			latents = attn(x, latents) + latents
+
+			latents = self.language_cross_attn(latents, language_tokens) + latents
+
+			latents = ff(latents) + latents
+
+			
+		latents = self.norm(latents)
+		
+		return latents
+		
+
 
 class LlavaMetaModel:
 
@@ -35,6 +176,7 @@ class LlavaMetaModel:
 		if hasattr(config, "mm_vision_tower"):
 			self.vision_tower = build_vision_tower(config, delay_load=True)
 			self.mm_projector = build_vision_projector(config)
+			self.resampler = PerceiverResampler()
 
 			if 'unpad' in getattr(config, 'mm_patch_merge_type', ''):
 				self.image_newline = nn.Parameter(
@@ -90,6 +232,10 @@ class LlavaMetaModel:
 			for p in self.mm_projector.parameters():
 				p.requires_grad = True
 
+
+		self.resampler = PerceiverResampler()
+
+
 		if pretrain_mm_mlp_adapter is not None:
 			mm_projector_weights = torch.load(pretrain_mm_mlp_adapter, map_location='cpu')
 			def get_w(weights, keyword):
@@ -138,7 +284,8 @@ class LlavaMetaForCausalLM(ABC):
 		return self.get_model().get_vision_tower()
 
 	def encode_images(self, images, languages = None):
-		image_features = self.get_model().get_vision_tower()(images, languages=languages)
+		image_features = self.get_model().get_vision_tower()(images)
+		image_features = self.get_model().resampler(image_features, languages).to(images.dtype)
 		image_features = self.get_model().mm_projector(image_features).to(images.dtype)
 		return image_features
 
@@ -156,38 +303,38 @@ class LlavaMetaForCausalLM(ABC):
 		new_input_ids_padded_for_emb = torch.where(input_ids==IMAGE_TOKEN_INDEX, 0, input_ids)
 		input_embeds = self.get_model().embed_tokens(new_input_ids_padded_for_emb)
 
-		language_embeds = None
+		#language_embeds = None
 		
-		# mask = (labels == -100) & (attention_mask) & (input_ids!=0) & (input_ids!=IMAGE_TOKEN_INDEX)
-		# mask[:, :35] = False 
-		# non_zero_counts = mask.sum(dim=1)
+		mask = (labels == -100) & (attention_mask) & (input_ids!=0) & (input_ids!=IMAGE_TOKEN_INDEX)
+		mask[:, :35] = False 
+		non_zero_counts = mask.sum(dim=1)
 
-		# #print("Count of instruction entries in the mask for each sample:", non_zero_counts)
+		#print("Count of instruction entries in the mask for each sample:", non_zero_counts)
 
-		# mask_expanded = mask.unsqueeze(-1).float()  # Adds an embedding_dim axis with size 1
+		mask_expanded = mask.unsqueeze(-1).float()  # Adds an embedding_dim axis with size 1
 
-		# # Multiply input_embeds by the expanded mask to zero out unwanted embeddings
-		# filtered_input_embeds = input_embeds * mask_expanded
+		# Multiply input_embeds by the expanded mask to zero out unwanted embeddings
+		filtered_input_embeds = input_embeds * mask_expanded
 
-		# # Placeholder values for demonstration
-		# number_of_text_tokens = 144  # The target number of tokens
-		# embedding_dim = filtered_input_embeds.size(2)  # Assuming the last dimension is embedding size
+		# Placeholder values for demonstration
+		number_of_text_tokens = 144  # The target number of tokens
+		embedding_dim = filtered_input_embeds.size(2)  # Assuming the last dimension is embedding size
 
-		# # Compute the number of non-zero embeddings per sequence
-		# non_zero_counts = mask.sum(dim=1)
+		# Compute the number of non-zero embeddings per sequence
+		non_zero_counts = mask.sum(dim=1)
 
-		# # Initialize a tensor to hold the output
-		# language_embeds = torch.zeros((filtered_input_embeds.size(0), number_of_text_tokens, embedding_dim),
-		# 							device=filtered_input_embeds.device, dtype=filtered_input_embeds.dtype)
+		# Initialize a tensor to hold the output
+		language_embeds = torch.zeros((filtered_input_embeds.size(0), number_of_text_tokens, embedding_dim),
+									device=filtered_input_embeds.device, dtype=filtered_input_embeds.dtype)
 
-		# # Loop over batches to truncate or pad
-		# # Note: This approach assumes compacting is necessary and uses a loop due to per-sequence operations.
-		# for i, (embeds, count) in enumerate(zip(filtered_input_embeds, non_zero_counts)):
-		# 	# Determine the end index for copying embeddings, limited by the target number or actual non-zero count
-		# 	end_idx = min(count.item(), number_of_text_tokens)
-		# 	if end_idx > 0:
-		# 		# Copy the embeddings up to end_idx
-		# 		language_embeds[i, :end_idx] = embeds[mask[i]][:end_idx]
+		# Loop over batches to truncate or pad
+		# Note: This approach assumes compacting is necessary and uses a loop due to per-sequence operations.
+		for i, (embeds, count) in enumerate(zip(filtered_input_embeds, non_zero_counts)):
+			# Determine the end index for copying embeddings, limited by the target number or actual non-zero count
+			end_idx = min(count.item(), number_of_text_tokens)
+			if end_idx > 0:
+				# Copy the embeddings up to end_idx
+				language_embeds[i, :end_idx] = embeds[mask[i]][:end_idx]
 
 		#print("input embed shape is", input_embeds.shape)
 		#print("labels shape is", labels.shape)
