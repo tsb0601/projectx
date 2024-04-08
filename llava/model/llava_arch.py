@@ -176,7 +176,7 @@ class LlavaMetaModel:
 		if hasattr(config, "mm_vision_tower"):
 			self.vision_tower = build_vision_tower(config, delay_load=True)
 			self.mm_projector = build_vision_projector(config)
-			#self.resampler = PerceiverResampler()
+			self.resampler = PerceiverResampler()
 
 			if 'unpad' in getattr(config, 'mm_patch_merge_type', ''):
 				self.image_newline = nn.Parameter(
@@ -233,7 +233,7 @@ class LlavaMetaModel:
 				p.requires_grad = True
 
 
-		#self.resampler = PerceiverResampler()
+		self.resampler = PerceiverResampler()
 
 		if pretrain_mm_mlp_adapter is not None:
 			mm_projector_weights = torch.load(pretrain_mm_mlp_adapter, map_location='cpu')
@@ -284,7 +284,7 @@ class LlavaMetaForCausalLM(ABC):
 
 	def encode_images(self, images, languages = None):
 		image_features = self.get_model().get_vision_tower()(images)
-		#image_features = self.get_model().resampler(image_features, languages).to(images.dtype)
+		image_features = self.get_model().resampler(image_features, languages).to(images.dtype)
 		image_features = self.get_model().mm_projector(image_features).to(images.dtype)
 		return image_features
 
@@ -304,36 +304,36 @@ class LlavaMetaForCausalLM(ABC):
 
 		language_embeds = None
 		
-		# mask = (labels == -100) & (attention_mask) & (input_ids!=0) & (input_ids!=IMAGE_TOKEN_INDEX)
-		# mask[:, :35] = False 
-		# non_zero_counts = mask.sum(dim=1)
+		mask = (labels == -100) & (attention_mask) & (input_ids!=0) & (input_ids!=IMAGE_TOKEN_INDEX)
+		mask[:, :35] = False 
+		non_zero_counts = mask.sum(dim=1)
 
-		# #print("Count of instruction entries in the mask for each sample:", non_zero_counts)
+		#print("Count of instruction entries in the mask for each sample:", non_zero_counts)
 
-		# mask_expanded = mask.unsqueeze(-1).float()  # Adds an embedding_dim axis with size 1
+		mask_expanded = mask.unsqueeze(-1).float()  # Adds an embedding_dim axis with size 1
 
-		# # Multiply input_embeds by the expanded mask to zero out unwanted embeddings
-		# filtered_input_embeds = input_embeds * mask_expanded
+		# Multiply input_embeds by the expanded mask to zero out unwanted embeddings
+		filtered_input_embeds = input_embeds * mask_expanded
 
-		# # Placeholder values for demonstration
-		# number_of_text_tokens = 144  # The target number of tokens
-		# embedding_dim = filtered_input_embeds.size(2)  # Assuming the last dimension is embedding size
+		# Placeholder values for demonstration
+		number_of_text_tokens = 144  # The target number of tokens
+		embedding_dim = filtered_input_embeds.size(2)  # Assuming the last dimension is embedding size
 
-		# # Compute the number of non-zero embeddings per sequence
-		# non_zero_counts = mask.sum(dim=1)
+		# Compute the number of non-zero embeddings per sequence
+		non_zero_counts = mask.sum(dim=1)
 
-		# # Initialize a tensor to hold the output
-		# language_embeds = torch.zeros((filtered_input_embeds.size(0), number_of_text_tokens, embedding_dim),
-		# 							device=filtered_input_embeds.device, dtype=filtered_input_embeds.dtype)
+		# Initialize a tensor to hold the output
+		language_embeds = torch.zeros((filtered_input_embeds.size(0), number_of_text_tokens, embedding_dim),
+									device=filtered_input_embeds.device, dtype=filtered_input_embeds.dtype)
 
-		# # Loop over batches to truncate or pad
-		# # Note: This approach assumes compacting is necessary and uses a loop due to per-sequence operations.
-		# for i, (embeds, count) in enumerate(zip(filtered_input_embeds, non_zero_counts)):
-		# 	# Determine the end index for copying embeddings, limited by the target number or actual non-zero count
-		# 	end_idx = min(count.item(), number_of_text_tokens)
-		# 	if end_idx > 0:
-		# 		# Copy the embeddings up to end_idx
-		# 		language_embeds[i, :end_idx] = embeds[mask[i]][:end_idx]
+		# Loop over batches to truncate or pad
+		# Note: This approach assumes compacting is necessary and uses a loop due to per-sequence operations.
+		for i, (embeds, count) in enumerate(zip(filtered_input_embeds, non_zero_counts)):
+			# Determine the end index for copying embeddings, limited by the target number or actual non-zero count
+			end_idx = min(count.item(), number_of_text_tokens)
+			if end_idx > 0:
+				# Copy the embeddings up to end_idx
+				language_embeds[i, :end_idx] = embeds[mask[i]][:end_idx]
 
 		#print("input embed shape is", input_embeds.shape)
 		#print("labels shape is", labels.shape)
