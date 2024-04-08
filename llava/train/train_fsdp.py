@@ -607,7 +607,7 @@ def preprocess_v1(
             if cur_len != total_len:
                 target[:] = IGNORE_INDEX
                 print(
-                    f"WARNING: tokenization mismatch: {cur_len} vs. {total_len}."
+                    f"WARNING: tokenization mismatch: {cur_len} vs. {total_len}, conversation is {conversation}."
                     f" (ignored)"
                 )
 
