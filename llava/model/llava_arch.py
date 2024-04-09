@@ -335,6 +335,34 @@ class LlavaMetaForCausalLM(ABC):
 		# 		# Copy the embeddings up to end_idx
 		# 		language_embeds[i, :end_idx] = embeds[mask[i]][:end_idx]
 
+		mask = (labels == -100) & (attention_mask) & (input_ids!=0) & (input_ids!=IMAGE_TOKEN_INDEX)
+		mask[:, :35] = False
+		non_zero_counts = mask.sum(dim=1)
+		mask_expanded = mask.unsqueeze(-1).float()  # Adds an embedding_dim axis with size 1
+
+		# Multiply input_embeds by the expanded mask to zero out unwanted embeddings
+		filtered_input_embeds = input_embeds * mask_expanded
+
+		# Placeholder values for demonstration
+		number_of_text_tokens = 144  # The target number of tokens
+		embedding_dim = filtered_input_embeds.size(2)  # Assuming the last dimension is embedding size
+
+		# Create a tensor of indices for gathering the masked embeddings
+		indices = torch.nonzero(mask, as_tuple=True)
+
+		# Gather the masked embeddings and reshape to (batch_size, max_non_zero_count, embedding_dim)
+		masked_embeddings = filtered_input_embeds[indices].view(filtered_input_embeds.size(0), -1, embedding_dim)
+
+		# Truncate or pad the masked embeddings to the target number of tokens
+		truncated_embeddings = masked_embeddings[:, :number_of_text_tokens]
+		padded_embeddings = torch.zeros((filtered_input_embeds.size(0), number_of_text_tokens, embedding_dim),
+										device=filtered_input_embeds.device, dtype=filtered_input_embeds.dtype)
+		padded_embeddings[:, :truncated_embeddings.size(1)] = truncated_embeddings
+
+		# Assign the padded embeddings to language_embeds
+		language_embeds = padded_embeddings
+
+
 		#print("input embed shape is", input_embeds.shape)
 		#print("labels shape is", labels.shape)
 		#print("attention mask shape is", attention_mask.shape)
