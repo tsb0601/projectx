@@ -157,7 +157,7 @@ class PerceiverResampler(nn.Module):
 		for attn, ff in self.layers:
 			latents = attn(x, latents) + latents
 
-			#latents = self.language_cross_attn(latents, language_tokens) + latents
+			latents = self.language_cross_attn(latents, x) + latents
 
 			latents = ff(latents) + latents
 
