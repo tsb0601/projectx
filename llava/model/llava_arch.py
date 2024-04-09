@@ -132,7 +132,7 @@ class PerceiverResampler(nn.Module):
 		self.latents = nn.Parameter(torch.randn(num_latents, dim))
 		self.media_pos_emb = nn.Parameter(torch.randn(1, dim))
 		self.language_cross_attn = LanguageCrossAttention(dim=dim, dim_head=dim_head, heads=heads)
-		#self.language_proj = nn.Linear(language_token_dim, dim)
+		self.language_proj = nn.Linear(language_token_dim, dim)
 
 		self.layers = nn.ModuleList([])
 		for _ in range(depth):
@@ -152,7 +152,7 @@ class PerceiverResampler(nn.Module):
 		x = x + self.media_pos_emb
 		latents = repeat(self.latents, 'n d -> b n d', b = x.shape[0])
 
-		#language_tokens = self.language_proj(language_tokens)
+		language_tokens = self.language_proj(language_tokens)
 		
 		for attn, ff in self.layers:
 			latents = attn(x, latents) + latents
