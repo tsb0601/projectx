@@ -131,7 +131,7 @@ class PerceiverResampler(nn.Module):
 		super().__init__()
 		self.latents = nn.Parameter(torch.randn(num_latents, dim))
 		self.media_pos_emb = nn.Parameter(torch.randn(1, dim))
-		#self.language_cross_attn = LanguageCrossAttention(dim=dim, dim_head=dim_head, heads=heads)
+		self.language_cross_attn = LanguageCrossAttention(dim=dim, dim_head=dim_head, heads=heads)
 		#self.language_proj = nn.Linear(language_token_dim, dim)
 
 		self.layers = nn.ModuleList([])
