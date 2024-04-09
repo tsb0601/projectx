@@ -325,7 +325,7 @@ class LlavaMetaForCausalLM(ABC):
 			
 			# Fill in the useful tokens in the language_embeds tensor
 			if num_useful_tokens > 0:
-				language_embeds[i, :num_useful_tokens] = input_embeds[i, useful_token_indices]
+				language_embeds[i, :num_useful_tokens] = input_embeds[i, useful_token_indices[:num_useful_tokens]]
 
 		# mask = (labels == -100) & (attention_mask) & (input_ids!=0) & (input_ids!=IMAGE_TOKEN_INDEX)
 		# mask[:, :35] = False
