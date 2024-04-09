@@ -302,14 +302,34 @@ class LlavaMetaForCausalLM(ABC):
 		new_input_ids_padded_for_emb = torch.where(input_ids==IMAGE_TOKEN_INDEX, 0, input_ids)
 		input_embeds = self.get_model().embed_tokens(new_input_ids_padded_for_emb)
 
-		language_embeds = None
+		#language_embeds = None
 		
+		mask = (labels == -100) & (attention_mask) & (input_ids!=0) & (input_ids!=IMAGE_TOKEN_INDEX)
+		mask[:, :35] = False
+
+		# Placeholder values for demonstration
+		number_of_text_tokens = 144  # The target number of tokens
+		embedding_dim = input_embeds.size(2)  # Assuming the last dimension is embedding size
+
+		# Initialize the language_embeds tensor with zeros
+		language_embeds = torch.zeros((input_embeds.size(0), number_of_text_tokens, embedding_dim),
+									device=input_embeds.device, dtype=input_embeds.dtype)
+
+		# Fill in the language_embeds tensor based on the mask
+		for i in range(input_embeds.size(0)):
+			# Get the indices of useful tokens for the current sequence
+			useful_token_indices = torch.nonzero(mask[i], as_tuple=True)[0]
+			
+			# Get the number of useful tokens for the current sequence
+			num_useful_tokens = useful_token_indices.size(0)
+			
+			# Fill in the useful tokens in the language_embeds tensor
+			if num_useful_tokens > 0:
+				language_embeds[i, :num_useful_tokens] = input_embeds[i, useful_token_indices]
+
 		# mask = (labels == -100) & (attention_mask) & (input_ids!=0) & (input_ids!=IMAGE_TOKEN_INDEX)
-		# mask[:, :35] = False 
+		# mask[:, :35] = False
 		# non_zero_counts = mask.sum(dim=1)
-
-		# #print("Count of instruction entries in the mask for each sample:", non_zero_counts)
-
 		# mask_expanded = mask.unsqueeze(-1).float()  # Adds an embedding_dim axis with size 1
 
 		# # Multiply input_embeds by the expanded mask to zero out unwanted embeddings
@@ -319,48 +339,20 @@ class LlavaMetaForCausalLM(ABC):
 		# number_of_text_tokens = 144  # The target number of tokens
 		# embedding_dim = filtered_input_embeds.size(2)  # Assuming the last dimension is embedding size
 
-		# # Compute the number of non-zero embeddings per sequence
-		# non_zero_counts = mask.sum(dim=1)
+		# # Create a tensor of indices for gathering the masked embeddings
+		# indices = torch.nonzero(mask, as_tuple=True)
 
-		# # Initialize a tensor to hold the output
-		# language_embeds = torch.zeros((filtered_input_embeds.size(0), number_of_text_tokens, embedding_dim),
-		# 							device=filtered_input_embeds.device, dtype=filtered_input_embeds.dtype)
+		# # Gather the masked embeddings and reshape to (batch_size, max_non_zero_count, embedding_dim)
+		# masked_embeddings = filtered_input_embeds[indices].view(filtered_input_embeds.size(0), -1, embedding_dim)
 
-		# # Loop over batches to truncate or pad
-		# # Note: This approach assumes compacting is necessary and uses a loop due to per-sequence operations.
-		# for i, (embeds, count) in enumerate(zip(filtered_input_embeds, non_zero_counts)):
-		# 	# Determine the end index for copying embeddings, limited by the target number or actual non-zero count
-		# 	end_idx = min(count.item(), number_of_text_tokens)
-		# 	if end_idx > 0:
-		# 		# Copy the embeddings up to end_idx
-		# 		language_embeds[i, :end_idx] = embeds[mask[i]][:end_idx]
+		# # Truncate or pad the masked embeddings to the target number of tokens
+		# truncated_embeddings = masked_embeddings[:, :number_of_text_tokens]
+		# padded_embeddings = torch.zeros((filtered_input_embeds.size(0), number_of_text_tokens, embedding_dim),
+		# 								device=filtered_input_embeds.device, dtype=filtered_input_embeds.dtype)
+		# padded_embeddings[:, :truncated_embeddings.size(1)] = truncated_embeddings
 
-		mask = (labels == -100) & (attention_mask) & (input_ids!=0) & (input_ids!=IMAGE_TOKEN_INDEX)
-		mask[:, :35] = False
-		non_zero_counts = mask.sum(dim=1)
-		mask_expanded = mask.unsqueeze(-1).float()  # Adds an embedding_dim axis with size 1
-
-		# Multiply input_embeds by the expanded mask to zero out unwanted embeddings
-		filtered_input_embeds = input_embeds * mask_expanded
-
-		# Placeholder values for demonstration
-		number_of_text_tokens = 144  # The target number of tokens
-		embedding_dim = filtered_input_embeds.size(2)  # Assuming the last dimension is embedding size
-
-		# Create a tensor of indices for gathering the masked embeddings
-		indices = torch.nonzero(mask, as_tuple=True)
-
-		# Gather the masked embeddings and reshape to (batch_size, max_non_zero_count, embedding_dim)
-		masked_embeddings = filtered_input_embeds[indices].view(filtered_input_embeds.size(0), -1, embedding_dim)
-
-		# Truncate or pad the masked embeddings to the target number of tokens
-		truncated_embeddings = masked_embeddings[:, :number_of_text_tokens]
-		padded_embeddings = torch.zeros((filtered_input_embeds.size(0), number_of_text_tokens, embedding_dim),
-										device=filtered_input_embeds.device, dtype=filtered_input_embeds.dtype)
-		padded_embeddings[:, :truncated_embeddings.size(1)] = truncated_embeddings
-
-		# Assign the padded embeddings to language_embeds
-		language_embeds = padded_embeddings
+		# # Assign the padded embeddings to language_embeds
+		# language_embeds = padded_embeddings
 
 
 		#print("input embed shape is", input_embeds.shape)
