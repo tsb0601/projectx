@@ -317,11 +317,11 @@ class LlavaMetaForCausalLM(ABC):
 
 		# Fill in the language_embeds tensor based on the mask
 		for i in range(input_embeds.size(0)):
-			# Get the indices of useful tokens for the current sequence
+			 # Get the indices of useful tokens for the current sequence
 			useful_token_indices = torch.nonzero(mask[i], as_tuple=True)[0]
 			
 			# Get the number of useful tokens for the current sequence
-			num_useful_tokens = useful_token_indices.size(0)
+			num_useful_tokens = min(useful_token_indices.size(0), number_of_text_tokens)
 			
 			# Fill in the useful tokens in the language_embeds tensor
 			if num_useful_tokens > 0:
