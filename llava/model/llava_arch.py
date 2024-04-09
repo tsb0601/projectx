@@ -176,7 +176,7 @@ class LlavaMetaModel:
 		if hasattr(config, "mm_vision_tower"):
 			self.vision_tower = build_vision_tower(config, delay_load=True)
 			self.mm_projector = build_vision_projector(config)
-			self.resampler = PerceiverResampler()
+			#self.resampler = PerceiverResampler()
 
 			if 'unpad' in getattr(config, 'mm_patch_merge_type', ''):
 				self.image_newline = nn.Parameter(
@@ -233,7 +233,7 @@ class LlavaMetaModel:
 				p.requires_grad = True
 
 
-		self.resampler = PerceiverResampler()
+		#self.resampler = PerceiverResampler()
 
 		if pretrain_mm_mlp_adapter is not None:
 			mm_projector_weights = torch.load(pretrain_mm_mlp_adapter, map_location='cpu')
@@ -284,7 +284,7 @@ class LlavaMetaForCausalLM(ABC):
 
 	def encode_images(self, images, languages = None):
 		image_features = self.get_model().get_vision_tower()(images)
-		image_features = self.get_model().resampler(image_features, languages).to(images.dtype)
+		#image_features = self.get_model().resampler(image_features, languages).to(images.dtype)
 		image_features = self.get_model().mm_projector(image_features).to(images.dtype)
 		return image_features
 
@@ -302,30 +302,30 @@ class LlavaMetaForCausalLM(ABC):
 		new_input_ids_padded_for_emb = torch.where(input_ids==IMAGE_TOKEN_INDEX, 0, input_ids)
 		input_embeds = self.get_model().embed_tokens(new_input_ids_padded_for_emb)
 
-		#language_embeds = None
+		language_embeds = None
 		
-		mask = (labels == -100) & (attention_mask) & (input_ids!=0) & (input_ids!=IMAGE_TOKEN_INDEX)
-		mask[:, :35] = False
+		# mask = (labels == -100) & (attention_mask) & (input_ids!=0) & (input_ids!=IMAGE_TOKEN_INDEX)
+		# mask[:, :35] = False
 
-		# Placeholder values for demonstration
-		number_of_text_tokens = 144  # The target number of tokens
-		embedding_dim = input_embeds.size(2)  # Assuming the last dimension is embedding size
+		# # Placeholder values for demonstration
+		# number_of_text_tokens = 144  # The target number of tokens
+		# embedding_dim = input_embeds.size(2)  # Assuming the last dimension is embedding size
 
-		# Initialize the language_embeds tensor with zeros
-		language_embeds = torch.zeros((input_embeds.size(0), number_of_text_tokens, embedding_dim),
-									device=input_embeds.device, dtype=input_embeds.dtype)
+		# # Initialize the language_embeds tensor with zeros
+		# language_embeds = torch.zeros((input_embeds.size(0), number_of_text_tokens, embedding_dim),
+		# 							device=input_embeds.device, dtype=input_embeds.dtype)
 
-		# Fill in the language_embeds tensor based on the mask
-		for i in range(input_embeds.size(0)):
-			 # Get the indices of useful tokens for the current sequence
-			useful_token_indices = torch.nonzero(mask[i], as_tuple=True)[0]
+		# # Fill in the language_embeds tensor based on the mask
+		# for i in range(input_embeds.size(0)):
+		# 	 # Get the indices of useful tokens for the current sequence
+		# 	useful_token_indices = torch.nonzero(mask[i], as_tuple=True)[0]
 			
-			# Get the number of useful tokens for the current sequence
-			num_useful_tokens = min(useful_token_indices.size(0), number_of_text_tokens)
+		# 	# Get the number of useful tokens for the current sequence
+		# 	num_useful_tokens = min(useful_token_indices.size(0), number_of_text_tokens)
 			
-			# Fill in the useful tokens in the language_embeds tensor
-			if num_useful_tokens > 0:
-				language_embeds[i, :num_useful_tokens] = input_embeds[i, useful_token_indices[:num_useful_tokens]]
+		# 	# Fill in the useful tokens in the language_embeds tensor
+		# 	if num_useful_tokens > 0:
+		# 		language_embeds[i, :num_useful_tokens] = input_embeds[i, useful_token_indices[:num_useful_tokens]]
 
 		# mask = (labels == -100) & (attention_mask) & (input_ids!=0) & (input_ids!=IMAGE_TOKEN_INDEX)
 		# mask[:, :35] = False
