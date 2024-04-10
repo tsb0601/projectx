@@ -1,5 +1,12 @@
 #!/bin/bash
 
+export PJRT_DEVICE=TPU
+export XLA_USE_BF16=0
+export WANDB_ENTITY=nyu-visionx
+export WANDB_PROJECT=llava
+export CKPT_NAME="llava-v1.5-yi-finetune-5565k"
+
+
 python llava/train/train_tpu.py \
     --model_name_or_path /mnt/disks/storage/llm_ckpts/Nous-Hermes-2-Yi-34B \
     --version chatml_direct \
@@ -13,7 +20,7 @@ python llava/train/train_tpu.py \
     --image_aspect_ratio pad \
     --group_by_modality_length True \
     --bf16 False \
-    --output_dir ./checkpoints/llava-v1.5-yi-finetune-5565k \
+    --output_dir ./checkpoints/$CKPT_NAME \
     --num_train_epochs 1 \
     --per_device_train_batch_size 4 \
     --per_device_eval_batch_size 4 \
@@ -33,6 +40,21 @@ python llava/train/train_tpu.py \
     --dataloader_num_workers 4 \
     --lazy_preprocess True \
     --report_to wandb \
+    --run_name $CKPT_NAME \
     --fsdp "full_shard" \
     --fsdp_config fsdp_config.json
 
+
+CKPT_PATH=checkpoints/$CKPT_NAME
+
+# check if the checkpoint path exists
+if [ ! -d "$CKPT_PATH" ]; then
+    echo "Checkpoint path does not exist. Exiting..."
+    exit 1
+fi
+
+echo "Training finished. Syncing checkpoints to GCS..."
+
+gcloud alpha storage rsync $CKPT_PATH gs://us-central2-storage/cambrian/checkpoints/$CKPT_NAME
+
+echo "Syncing finished. Checkpoints are now available at gs://us-central2-storage/cambrian/checkpoints/$CKPT_NAME"
