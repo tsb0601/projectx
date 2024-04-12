@@ -440,9 +440,33 @@ conv_chatml_direct_ft = Conversation(
     sep="<|im_end|>",
 )
 
+conv_cambrian_v1 = Conversation(
+    system="You are Cambrian, a highly intelligent multimodal AI trained by NYU Vision X. "
+    "As a multimodal AI, you have the ability to process and analyze images. Whenever an image is present in the conversation, very carefully examine it and consider its content when formulating your response."
+    "You should give concise responses to very simple questions, but provide thorough responses to more complex and open-ended questions. ",
+    roles=("USER", "ASSISTANT"),
+    version="v1",
+    messages=(),
+    offset=0,
+    sep_style=SeparatorStyle.TWO,
+    sep=" ",
+    sep2="</s>",
+)
+
+
 #default_conversation = conv_llava_cohere
+
+
+# For Cambrian
+default_conversation = conv_cambrian_v1
+
+
+# For Vicuna
 #default_conversation = conv_vicuna_v1
-default_conversation = conv_chatml_direct
+
+
+# For Yi
+#default_conversation = conv_chatml_direct
 
 conv_templates = {
     "default": conv_vicuna_v0,
