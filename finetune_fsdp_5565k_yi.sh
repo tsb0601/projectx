@@ -4,7 +4,7 @@ export PJRT_DEVICE=TPU
 export XLA_USE_BF16=0
 export WANDB_ENTITY=nyu-visionx
 export WANDB_PROJECT=llava
-export CKPT_NAME="llava-v1.5-yi-finetune-5565k"
+export CKPT_NAME="yi-finetune-5565k"
 
 
 python llava/train/train_tpu.py \
@@ -14,7 +14,7 @@ python llava/train/train_tpu.py \
     --image_folder /mnt/disks/storage/data/finetune_data \
     --vision_tower openai/clip-vit-large-patch14-336 \
     --mm_projector_type mlp2x_gelu \
-    --image_position 66 \
+    --image_position 86 \
     --mm_vision_select_layer -2 \
     --mm_use_im_start_end False \
     --mm_use_im_patch_token False \
