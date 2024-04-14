@@ -4,7 +4,7 @@ export PJRT_DEVICE=TPU
 export XLA_USE_BF16=0
 export WANDB_ENTITY=nyu-visionx
 export WANDB_PROJECT=llava
-export CKPT_NAME="llava-v1.5-7b-finetune-6494k-cambriansys"
+export CKPT_NAME="TPU-llava-v1.5-7b-finetune-6494k-cambriansys"
 
 python llava/train/train_tpu.py \
     --model_name_or_path lmsys/vicuna-7b-v1.5 \
@@ -22,14 +22,14 @@ python llava/train/train_tpu.py \
     --bf16 False \
     --output_dir ./checkpoints/$CKPT_NAME \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 16 \
+    --per_device_train_batch_size 8 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \
     --save_strategy "steps" \
     --save_steps 100000 \
     --save_total_limit 1 \
-    --learning_rate 6e-5 \
+    --learning_rate 2e-5 \
     --weight_decay 0. \
     --warmup_ratio 0.03 \
     --lr_scheduler_type "cosine" \

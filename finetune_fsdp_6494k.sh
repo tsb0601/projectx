@@ -4,7 +4,7 @@ export PJRT_DEVICE=TPU
 export XLA_USE_BF16=0
 export WANDB_ENTITY=nyu-visionx
 export WANDB_PROJECT=llava
-export CKPT_NAME="llava-v1.5-7b-finetune-6494k"
+export CKPT_NAME="TPU-llava-v1.5-7b-finetune-6494k"
 
 python llava/train/train_tpu.py \
     --model_name_or_path lmsys/vicuna-7b-v1.5 \
