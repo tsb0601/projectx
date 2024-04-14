@@ -1523,8 +1523,7 @@ def train(INDEX, attn_implementation=None):
                 bnb_4bit_quant_type=training_args.quant_type  # {'fp4', 'nf4'}
             )
         ))
-    else:
-        #logger.info(f"Loading model in full precision")
+   
     use_cohere=False
     if model_args.vision_tower is not None:
         if 'mpt' in model_args.model_name_or_path:
