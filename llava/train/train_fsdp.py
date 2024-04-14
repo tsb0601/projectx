@@ -1800,8 +1800,6 @@ def train(INDEX, attn_implementation=None):
 
 
     # convert_to_bf16_except_llama(model)
-    if training_args.bf16:
-        model = model.to(dtype = torch.float32)
 
     # gcloud_callback = GCloudRsyncCallback(training_args.output_dir, training_args.gcs_output_dir, training_args.gcp_project)
 
