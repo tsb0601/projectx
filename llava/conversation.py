@@ -470,11 +470,11 @@ conv_cambrian_yi = Conversation(
 
 
 # For Cambrian
-#default_conversation = conv_cambrian_v1
+default_conversation = conv_cambrian_v1
 
 
 # For Vicuna
-default_conversation = conv_vicuna_v1
+#default_conversation = conv_vicuna_v1
 
 # For Yi
 #default_conversation = conv_chatml_direct
