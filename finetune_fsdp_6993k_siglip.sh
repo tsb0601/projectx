@@ -14,7 +14,6 @@ python llava/train/train_tpu.py \
     --vision_tower siglip/CLIP-ViT-SO400M-14-384 \
     --mm_projector_type mlp2x_gelu \
     --unfreeze_mm_vision_tower True \
-    --image_token_len 729 \ 
     --mm_vision_select_layer -2 \
     --mm_use_im_start_end False \
     --mm_use_im_patch_token False \
@@ -23,6 +22,7 @@ python llava/train/train_tpu.py \
     --bf16 False \
     --output_dir ./checkpoints/$CKPT_NAME \
     --num_train_epochs 1 \
+    --image_token_len 729 \
     --per_device_train_batch_size 8 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
