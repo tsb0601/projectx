@@ -14,6 +14,7 @@ python llava/train/train_tpu.py \
     --vision_tower siglip/CLIP-ViT-SO400M-14-384 \
     --mm_projector_type mlp2x_gelu \
     --unfreeze_mm_vision_tower True \
+    --image_token_len 729 \ 
     --mm_vision_select_layer -2 \
     --mm_use_im_start_end False \
     --mm_use_im_patch_token False \
