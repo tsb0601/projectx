@@ -37,6 +37,8 @@ class CLIPVisionTower(nn.Module):
 
         self.select_layer = args.mm_vision_select_layer
         self.select_feature = getattr(args, 'mm_vision_select_feature', 'patch')
+
+        self.unfreeze_mm_vision_tower = getattr(args, 'unfreeze_mm_vision_tower', False)
         
         if not delay_load:
             self.load_model()
@@ -82,7 +84,7 @@ class CLIPVisionTower(nn.Module):
             self.vision_tower = CLIPVisionModel.from_pretrained(self.vision_tower_name)
 
         
-        self.vision_tower.requires_grad_(False)
+        self.vision_tower.requires_grad_(self.unfreeze_mm_vision_tower)
 
         self.is_loaded = True
 
@@ -97,7 +99,7 @@ class CLIPVisionTower(nn.Module):
             raise ValueError(f'Unexpected select feature: {self.select_feature}')
         return image_features
 
-    @torch.no_grad()
+    
     def forward(self, images):
         
         # Very Important for TorchXLA
@@ -107,23 +109,21 @@ class CLIPVisionTower(nn.Module):
             from torch_xla.utils.checkpoint import checkpoint
             self.vision_tower.vision_model.encoder._gradient_checkpointing_func = checkpoint 
 
-        if type(images) is list:
-            image_features = []
-            for image in images:
-                image_forward_out = self.vision_tower(image.to(device=self.device, dtype=self.dtype).unsqueeze(0), output_hidden_states=True)
-                image_feature = self.feature_select(image_forward_out).to(image.dtype)
-                image_features.append(image_feature)
-        else:
-            if self.vision_model == "oai-clip":
-                with torch.no_grad():
+        with torch.set_grad_enabled(self.unfreeze_mm_vision_tower):
+            if type(images) is list:
+                image_features = []
+                for image in images:
+                    image_forward_out = self.vision_tower(image.to(device=self.device, dtype=self.dtype).unsqueeze(0), output_hidden_states=True)
+                    image_feature = self.feature_select(image_forward_out).to(image.dtype)
+                    image_features.append(image_feature)
+            else:
+                if self.vision_model == "oai-clip":
                     image_forward_outs = self.vision_tower(images.to(device=self.device, dtype=self.dtype), output_hidden_states=True)
                     image_features = self.feature_select(image_forward_outs).to(images.dtype)
-            elif self.vision_model == "dfn-clip":
-                with torch.no_grad():
+                elif self.vision_model == "dfn-clip":
                     #print(images.shape)
                     _, image_features = self.vision_tower(images.to(device=self.device, dtype=self.dtype))
-            elif self.vision_model == "siglip" or self.vision_model == "evaclip":
-                with torch.no_grad():
+                elif self.vision_model == "siglip" or self.vision_model == "evaclip":
                     #print(images.shape)
                     image_forward_outs = self.vision_tower.forward_features(images.to(device=self.device, dtype=self.dtype))
                     #print(image_forward_outs.shape)

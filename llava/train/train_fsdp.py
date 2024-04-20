@@ -93,6 +93,7 @@ class TrainingArguments(transformers.TrainingArguments):
     remove_unused_columns: bool = field(default=False)
     freeze_mm_mlp_adapter: bool = field(default=False)
     mpt_attn_impl: Optional[str] = field(default="triton")
+    unfreeze_mm_vision_tower: bool = field(default=False)
     model_max_length: int = field(
         default=512,
         metadata={
@@ -1526,73 +1527,63 @@ def train(INDEX, attn_implementation=None):
    
     use_cohere=False
     if model_args.vision_tower is not None:
-        if 'mpt' in model_args.model_name_or_path:
-            #logger.warning(f"MPT model, loading LlavaMptForCausalLM: {model_args.model_name_or_path}")
-            config = transformers.AutoConfig.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
-            config.attn_config['attn_impl'] = training_args.mpt_attn_impl
-            model = LlavaMptForCausalLM.from_pretrained(
-                model_args.model_name_or_path,
-                config=config,
+    
+        # Assuming model_args.model_name_or_path is a string that includes the model size
+        model_name = model_args.model_name_or_path
+
+        # Regular expression to find the number of parameters in the model's name (assuming a convention like 'ModelName-30b')
+        match = re.search(r'(\d+)b', model_name)
+        num_parameters_billion = float(match.group(1)) if match else 0
+
+        # Determine if bfloat16 should be used based on the model's size
+        use_bfloat16 = training_args.bf16 or num_parameters_billion > 30
+        if "yi" in model_name.lower():
+            use_bfloat16 = True
+        if "mixtral" in model_name.lower():
+            model = LlavaMixtralForCausalLM.from_pretrained(
+                model_name,
                 cache_dir=training_args.cache_dir,
+                torch_dtype=torch.bfloat16,
                 **bnb_model_from_pretrained_args
             )
+            transformers.models.mixtral.modeling_mixtral.MixtralRMSNorm.forward = forward
+        elif "c4ai" in model_name.lower():
+            model = LlavaCohereForCausalLM.from_pretrained(
+                model_name,
+                cache_dir=training_args.cache_dir,
+                torch_dtype=torch.bfloat16,
+                **bnb_model_from_pretrained_args
+            )
+            use_cohere=True
+        
+        elif "mistral" in model_name.lower():
+            #logger.warning(f"Vision tower, loading LlavaMistralForCausalLM: {model_args.model_name_or_path}")
+
+            # replace training_args.fsdp_config.transformer_layer_cls_to_wrap with MistralDecoderLayer
+            if (
+                hasattr(training_args, 'fsdp_config') and
+                'transformer_layer_cls_to_wrap' in training_args.fsdp_config.keys()
+            ):
+                #logger.warning(f"Replacing training_args.fsdp_config.transformer_layer_cls_to_wrap with MistralDecoderLayer. Previous value: {training_args.fsdp_config['transformer_layer_cls_to_wrap']}")
+                training_args.fsdp_config["transformer_layer_cls_to_wrap"] = ["MistralDecoderLayer"]
+
+            model = LlavaMistralForCausalLM.from_pretrained(
+                model_name,
+                cache_dir=training_args.cache_dir,
+                #do_sample=True,
+                torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
+                **bnb_model_from_pretrained_args
+            )
+            transformers.models.mistral.modeling_mistral.MistralRMSNorm.forward = forward
         else:
-            # Assuming model_args.model_name_or_path is a string that includes the model size
-            model_name = model_args.model_name_or_path
-
-            # Regular expression to find the number of parameters in the model's name (assuming a convention like 'ModelName-30b')
-            match = re.search(r'(\d+)b', model_name)
-            num_parameters_billion = float(match.group(1)) if match else 0
-
-            # Determine if bfloat16 should be used based on the model's size
-            use_bfloat16 = training_args.bf16 or num_parameters_billion > 30
-            if "yi" in model_name.lower():
-                use_bfloat16 = True
-            if "mixtral" in model_name.lower():
-                model = LlavaMixtralForCausalLM.from_pretrained(
-                    model_name,
-                    cache_dir=training_args.cache_dir,
-                    torch_dtype=torch.bfloat16,
-                    **bnb_model_from_pretrained_args
-                )
-                transformers.models.mixtral.modeling_mixtral.MixtralRMSNorm.forward = forward
-            elif "c4ai" in model_name.lower():
-                model = LlavaCohereForCausalLM.from_pretrained(
-                    model_name,
-                    cache_dir=training_args.cache_dir,
-                    torch_dtype=torch.bfloat16,
-                    **bnb_model_from_pretrained_args
-                )
-                use_cohere=True
-            
-            elif "mistral" in model_name.lower():
-                #logger.warning(f"Vision tower, loading LlavaMistralForCausalLM: {model_args.model_name_or_path}")
-
-                # replace training_args.fsdp_config.transformer_layer_cls_to_wrap with MistralDecoderLayer
-                if (
-                    hasattr(training_args, 'fsdp_config') and
-                    'transformer_layer_cls_to_wrap' in training_args.fsdp_config.keys()
-                ):
-                    #logger.warning(f"Replacing training_args.fsdp_config.transformer_layer_cls_to_wrap with MistralDecoderLayer. Previous value: {training_args.fsdp_config['transformer_layer_cls_to_wrap']}")
-                    training_args.fsdp_config["transformer_layer_cls_to_wrap"] = ["MistralDecoderLayer"]
-
-                model = LlavaMistralForCausalLM.from_pretrained(
-                    model_name,
-                    cache_dir=training_args.cache_dir,
-                    #do_sample=True,
-                    torch_dtype=(torch.bfloat16 if training_args.bf16 else None),
-                    **bnb_model_from_pretrained_args
-                )
-                transformers.models.mistral.modeling_mistral.MistralRMSNorm.forward = forward
-            else:
-                #logger.warning(f"Vision tower, loading LlavaLlamaForCausalLM: {model_args.model_name_or_path}")
-                model = LlavaLlamaForCausalLM.from_pretrained(
-                    model_args.model_name_or_path,
-                    cache_dir=training_args.cache_dir,
-                    #do_sample=True,
-                	torch_dtype=(torch.bfloat16 if use_bfloat16 else None),
-                    **bnb_model_from_pretrained_args
-                )
+            #logger.warning(f"Vision tower, loading LlavaLlamaForCausalLM: {model_args.model_name_or_path}")
+            model = LlavaLlamaForCausalLM.from_pretrained(
+                model_args.model_name_or_path,
+                cache_dir=training_args.cache_dir,
+                #do_sample=True,
+                torch_dtype=(torch.bfloat16 if use_bfloat16 else None),
+                **bnb_model_from_pretrained_args
+            )
 
             # model = LlavaLlamaForCausalLM.from_pretrained(
             # 		model_args.model_name_or_path,
@@ -1712,14 +1703,20 @@ def train(INDEX, attn_implementation=None):
     print("tokenizer is", tokenizer)
     if model_args.vision_tower is not None:
         #logger.info("Initializing vision modules...")
+        model_args.unfreeze_mm_vision_tower = training_args.unfreeze_mm_vision_tower
         model.get_model().initialize_vision_modules(
             model_args=model_args,
             fsdp=training_args.fsdp
         )
+        model.config.unfreeze_mm_vision_tower = training_args.unfreeze_mm_vision_tower
 
         vision_tower = model.get_vision_tower()
         # vision_tower.to(dtype=torch.bfloat16 if training_args.bf16 else torch.float16, device=training_args.device)
-        vision_tower.to(dtype=torch.bfloat16, device=training_args.device)
+        
+        if not training_args.unfreeze_mm_vision_tower:
+            vision_tower.to(dtype=torch.bfloat16, device=training_args.device)
+        else:
+            vision_tower.to(device=training_args.device)
 
         data_args.image_processor = vision_tower.image_processor
         data_args.is_multimodal = True
@@ -1740,6 +1737,9 @@ def train(INDEX, attn_implementation=None):
             #logger.info("Freezing multimodal mlp adapter...")
             for p in model.get_model().mm_projector.parameters():
                 p.requires_grad = False
+        if training_args.unfreeze_mm_vision_tower:
+            for p in model.get_model().get_vision_tower().parameters():
+                p.requires_grad = True
 
         if training_args.bits in [4, 8]:
             #logger.info(f"Initializing vision modules in {training_args.bits}bit")

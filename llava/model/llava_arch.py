@@ -201,7 +201,8 @@ class LlavaMetaModel:
 		if self.get_vision_tower() is None:
 			vision_tower = build_vision_tower(model_args)
 
-			if fsdp is not None and len(fsdp) > 0:
+			if (fsdp is not None and len(fsdp) > 0) or \
+                    (hasattr(model_args, 'unfreeze_mm_vision_tower') and model_args.unfreeze_mm_vision_tower):
 				self.vision_tower = [vision_tower]
 			else:
 				self.vision_tower = vision_tower
