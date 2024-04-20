@@ -11,7 +11,7 @@ python llava/train/train_tpu.py \
     --version v1 \
     --data_path /mnt/disks/storage/data/finetune_data/6993kL.jsonl \
     --image_folder /mnt/disks/storage/data/finetune_data \
-    --vision_tower openai/clip-vit-large-patch14-336 \
+    --vision_tower siglip/CLIP-ViT-SO400M-14-384 \
     --mm_projector_type mlp2x_gelu \
     --unfreeze_mm_vision_tower True \
     --mm_vision_select_layer -2 \
@@ -22,7 +22,7 @@ python llava/train/train_tpu.py \
     --bf16 False \
     --output_dir ./checkpoints/$CKPT_NAME \
     --num_train_epochs 1 \
-    --image_token_len 576 \
+    --image_token_len 729 \
     --per_device_train_batch_size 8 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
