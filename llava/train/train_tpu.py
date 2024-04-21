@@ -63,6 +63,6 @@ if __name__ == "__main__":
     import torch_xla.distributed.xla_multiprocessing as xmp
    
    
-    mp.set_start_method('spawn')
+    mp.set_start_method('spawn', force=True)
     xmp.spawn(train, args=(None,))
 
