@@ -136,7 +136,6 @@ class HybridVisionTower(BaseVisionTower):
                 image_features = vision_tower._forward(batch_tensor.to(device=self.device, dtype=self.dtype))
 
                 b, num_tokens, dim = image_features.shape
-                print("before:", image_features.shape)
                 if num_tokens != self.image_token_len:
                     target_h = target_w = int(np.sqrt(self.image_token_len))
                     h = w = int(np.sqrt(num_tokens))
@@ -145,13 +144,11 @@ class HybridVisionTower(BaseVisionTower):
                     image_features = F.interpolate(image_features.to(torch.float32), size=(target_h, target_w), mode='bilinear', align_corners=False).to(image_features.dtype)
                     image_features = image_features.permute(0, 2, 3, 1).contiguous().flatten(1, 2)
 
-                    print("after:", image_features.shape)
 
                 output_images_features.append(image_features)
 
             output_tensor = torch.cat(output_images_features, dim=-1)
 
-            print(output_tensor.shape)
             return output_tensor
 
     @property
