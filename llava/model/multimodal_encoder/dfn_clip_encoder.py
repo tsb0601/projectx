@@ -1,93 +1,36 @@
 import torch
-import torch.nn as nn
+from open_clip import create_model_from_pretrained 
 
-from transformers import CLIPVisionModel, CLIPImageProcessor, CLIPVisionConfig
+from .base_encoder import ProcessorWrapper
+from .clip_encoder import ClipVisionTower
 
 
-class CLIPVisionTower(nn.Module):
-    def __init__(self, vision_tower, args, delay_load=False):
-        super().__init__()
-
-        self.is_loaded = False
-
-        self.vision_tower_name = vision_tower
-        self.select_layer = args.mm_vision_select_layer
-        self.select_feature = getattr(args, 'mm_vision_select_feature', 'patch')
-
-        if not delay_load:
-            self.load_model()
-        elif getattr(args, 'unfreeze_mm_vision_tower', False):
-            self.load_model()
-        else:
-            self.cfg_only = CLIPVisionConfig.from_pretrained(self.vision_tower_name)
-
+class DfnClipVisionTower(ClipVisionTower):
     def load_model(self):
-        self.image_processor = CLIPImageProcessor.from_pretrained(self.vision_tower_name)
-        self.vision_tower = CLIPVisionModel.from_pretrained(self.vision_tower_name)
-        self.vision_tower.requires_grad_(False)
+        if self.vision_tower_name == "apple/DFN5B-CLIP-ViT-H-14-378":
+            clip_model, processor = create_model_from_pretrained('hf-hub:apple/DFN5B-CLIP-ViT-H-14-384')
+            # self._hidden_size = 1280
+            # self.image_processor = ProcessorWrapper(processor)
+        elif self.vision_tower_name == "apple/DFN2B-CLIP-ViT-L-14":
+            clip_model, processor = create_model_from_pretrained('hf-hub:apple/DFN2B-CLIP-ViT-L-14')
+            # self._hidden_size = 1024
+            # self.image_processor = ProcessorWrapper(processor, height=224, width=224)
+        
+        else:
+            raise ValueError(f'Unknown vision tower: {self.vision_tower_name}')
+        
+        self.vision_tower = clip_model.visual
+        self.vision_tower.output_tokens = True
 
+        self._hidden_size = clip_model.visual.ln_post.normalized_shape[0]
+        self._image_size = clip_model.visual.image_size[0]
+        self._patch_size = clip_model.visual.patch_size[0]
+        self.image_processor = ProcessorWrapper(processor, height=self._image_size, width=self._image_size)
+
+        self.vision_tower.requires_grad_(False)
         self.is_loaded = True
 
-    def feature_select(self, image_forward_outs):
-        image_features = image_forward_outs.hidden_states[self.select_layer]
-        if self.select_feature == 'patch':
-            image_features = image_features[:, 1:]
-        elif self.select_feature == 'cls_patch':
-            image_features = image_features
-        else:
-            raise ValueError(f'Unexpected select feature: {self.select_feature}')
-        return image_features
-
-    @torch.no_grad()
-    def forward(self, images):
-        
-        # Very Important for TorchXLA
-        #self.vision_tower.vision_model.encoder.gradient_checkpointing = False
-        
-        from torch_xla.utils.checkpoint import checkpoint
-        self.vision_tower.vision_model.encoder._gradient_checkpointing_func = checkpoint 
-        
-
-        if type(images) is list:
-            image_features = []
-            for image in images:
-                image_forward_out = self.vision_tower(image.to(device=self.device, dtype=self.dtype).unsqueeze(0), output_hidden_states=True)
-                image_feature = self.feature_select(image_forward_out).to(image.dtype)
-                image_features.append(image_feature)
-        else:
-            with torch.no_grad():
-                image_forward_outs = self.vision_tower(images.to(device=self.device, dtype=self.dtype), output_hidden_states=True)
-                image_features = self.feature_select(image_forward_outs).to(images.dtype)
-
-        return image_features
-
-    @property
-    def dummy_feature(self):
-        return torch.zeros(1, self.hidden_size, device=self.device, dtype=self.dtype)
-
-    @property
-    def dtype(self):
-        return self.vision_tower.dtype
-
-    @property
-    def device(self):
-        return self.vision_tower.device
-
-    @property
-    def config(self):
-        if self.is_loaded:
-            return self.vision_tower.config
-        else:
-            return self.cfg_only
-
-    @property
-    def hidden_size(self):
-        return self.config.hidden_size
-
-    @property
-    def num_patches_per_side(self):
-        return self.config.image_size // self.config.patch_size
-
-    @property
-    def num_patches(self):
-        return (self.config.image_size // self.config.patch_size) ** 2
+    def _forward(self, images):
+        with torch.set_grad_enabled(self.unfreeze_mm_vision_tower):
+            _, image_features = self.vision_tower(images.to(device=self.device, dtype=self.dtype))
+            return image_features
