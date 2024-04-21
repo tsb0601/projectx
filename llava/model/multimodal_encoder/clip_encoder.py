@@ -24,8 +24,7 @@ class ClipVisionTower(BaseVisionTower):
         self.is_loaded = True
 
         # Very Important for TorchXLA
-        from torch_xla.utils.checkpoint import checkpoint
-        self.vision_tower.vision_model.encoder._gradient_checkpointing_func = checkpoint 
+        
 
     def _feature_select(self, image_features):
         if self.select_feature == 'patch':
@@ -41,6 +40,9 @@ class ClipVisionTower(BaseVisionTower):
         return self._feature_select(image_features)
 
     def _forward(self, images):
+        from torch_xla.utils.checkpoint import checkpoint
+        self.vision_tower.vision_model.encoder._gradient_checkpointing_func = checkpoint 
+        
         with torch.set_grad_enabled(self.unfreeze_mm_vision_tower):
             image_forward_outs = self.vision_tower(images.to(device=self.device, dtype=self.dtype), output_hidden_states=True)
             image_features = self.feature_select(image_forward_outs).to(images.dtype)
