@@ -9,7 +9,7 @@ export CKPT_NAME="TPU-llava-v1.5-7b-finetune-737k-hybrid-dino-siglip-midas"
 python llava/train/train_tpu.py \
     --model_name_or_path lmsys/vicuna-7b-v1.5 \
     --version v1 \
-    --data_path /mnt/disks/storage/data/finetune_data/737k.jsonl \
+    --data_path /mnt/disks/storage/data/finetune_data/jsons/737k.jsonl \
     --image_folder /mnt/disks/storage/data/finetune_data \
     --vision_tower hybridmodel-siglip/CLIP-ViT-SO400M-14-384-and-large-midas-and-facebook/dinov2-giant-res384 \
     --mm_projector_type mlp2x_gelu \
