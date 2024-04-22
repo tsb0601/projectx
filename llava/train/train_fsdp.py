@@ -427,7 +427,7 @@ def preprocess_llama_3(
         #print("Conversation is:", conversation)
         #print("It is seperated to:", rounds)
         #print("------------------------------")
-        cur_len = 0
+        cur_len = 1
         #target[:cur_len] = IGNORE_INDEX
         for i, rou in enumerate(rounds):
             if rou == "":
