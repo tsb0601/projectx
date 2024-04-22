@@ -1777,6 +1777,7 @@ def train(INDEX, attn_implementation=None):
         model = get_peft_model(model, lora_config)
 
     #logger.info("Configuring tokenizer...")
+    print("I used fast tokenizer", use_cohere)
     if 'mpt' in model_args.model_name_or_path:
         tokenizer = transformers.AutoTokenizer.from_pretrained(
             model_args.model_name_or_path,
@@ -1811,8 +1812,8 @@ def train(INDEX, attn_implementation=None):
     elif model_args.version == "v0.5":
         tokenizer.pad_token = tokenizer.unk_token
     elif model_args.version == "llama_v3":
-        #tokenizer.pad_token = tokenizer.eos_token
-        tokenizer.pad_token_id = tokenizer.pad_id
+        tokenizer.pad_token = "<|reserved_special_token_0|>"
+        tokenizer.pad_token_id = 128002
     else:
         tokenizer.pad_token = tokenizer.unk_token
         if model_args.version in conversation_lib.conv_templates:
