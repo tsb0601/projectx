@@ -4,7 +4,7 @@ export PJRT_DEVICE=TPU
 export XLA_USE_BF16=0
 export WANDB_ENTITY=nyu-visionx
 export WANDB_PROJECT=llava
-export CKPT_NAME="TPU-llava-v1.5-8b-finetune-6993k-lr6e-5"
+export CKPT_NAME="TPU-llava-v1.5-8b-finetune-6993k-lr4e-5"
 
 python llava/train/train_tpu.py \
     --model_name_or_path /mnt/disks/storage/llm_ckpts/Meta-Llama-3-8B-Instruct \
@@ -30,7 +30,7 @@ python llava/train/train_tpu.py \
     --save_strategy "steps" \
     --save_steps 100000 \
     --save_total_limit 1 \
-    --learning_rate 6e-5 \
+    --learning_rate 4e-5 \
     --weight_decay 0. \
     --warmup_ratio 0.03 \
     --lr_scheduler_type "cosine" \
