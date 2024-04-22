@@ -1794,7 +1794,7 @@ def train(INDEX, attn_implementation=None):
         )
         
         
-    print("tokenizer id before operation is", tokenizer.pad_token_id)
+    print("unknown tokenizer is", tokenizer.unk_token)
 
 
     #logger.info(f"Model Conv Version: {model_args.version}")
@@ -1811,8 +1811,8 @@ def train(INDEX, attn_implementation=None):
     elif model_args.version == "v0.5":
         tokenizer.pad_token = tokenizer.unk_token
     elif model_args.version == "llama_v3":
-        tokenizer.pad_token = tokenizer.eos_token
-        tokenizer.pad_token_id = 128001
+        #tokenizer.pad_token = tokenizer.eos_token
+        tokenizer.pad_token_id = -1
     else:
         tokenizer.pad_token = tokenizer.unk_token
         if model_args.version in conversation_lib.conv_templates:
