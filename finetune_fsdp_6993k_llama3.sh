@@ -22,6 +22,7 @@ python llava/train/train_tpu.py \
     --output_dir ./checkpoints/$CKPT_NAME \
     --num_train_epochs 1 \
     --image_token_len 729 \
+    --image_position 92 \
     --per_device_train_batch_size 16 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
