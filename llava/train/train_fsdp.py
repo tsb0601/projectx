@@ -424,10 +424,10 @@ def preprocess_llama_3(
         total_len = int(target.ne(tokenizer.pad_token_id).sum())
 
         rounds = conversation.split("<|eot_id|>")
-        #print("Conversation is:", conversation)
-        #print("It is seperated to:", rounds)
-        #print("------------------------------")
-        cur_len = 1
+        print("Conversation is:", conversation, '\n')
+        print("It is seperated to:", rounds)
+        print("------------------------------")
+        cur_len = 0
         #target[:cur_len] = IGNORE_INDEX
         for i, rou in enumerate(rounds):
             if rou == "":
