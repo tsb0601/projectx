@@ -1812,7 +1812,7 @@ def train(INDEX, attn_implementation=None):
         tokenizer.pad_token = tokenizer.unk_token
     elif model_args.version == "llama_v3":
         #tokenizer.pad_token = tokenizer.eos_token
-        tokenizer.pad_token_id = -1
+        tokenizer.pad_token_id = tokenizer.pad_id
     else:
         tokenizer.pad_token = tokenizer.unk_token
         if model_args.version in conversation_lib.conv_templates:
