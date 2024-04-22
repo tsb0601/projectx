@@ -30,7 +30,7 @@ python llava/train/train_tpu.py \
     --save_strategy "steps" \
     --save_steps 100000 \
     --save_total_limit 1 \
-    --learning_rate 1.6e-4 \
+    --learning_rate 8e-5 \
     --weight_decay 0. \
     --warmup_ratio 0.03 \
     --lr_scheduler_type "cosine" \
