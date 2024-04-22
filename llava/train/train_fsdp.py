@@ -424,10 +424,10 @@ def preprocess_llama_3(
         total_len = int(target.ne(tokenizer.pad_token_id).sum())
 
         rounds = conversation.split("<|eot_id|>")
-        print("Conversation is:", conversation, '\n')
-        print("It is seperated to:", rounds)
-        print("has_image is:", has_image)
-        print("total_len is:", total_len)
+        # print("Conversation is:", conversation, '\n')
+        # print("It is seperated to:", rounds)
+        # print("has_image is:", has_image)
+        # print("total_len is:", total_len)
         
         cur_len = 0
         #target[:cur_len] = IGNORE_INDEX
@@ -458,7 +458,7 @@ def preprocess_llama_3(
                 # Don't predict system prompt
                 target[cur_len : cur_len + 3] = IGNORE_INDEX
                 cur_len += round_len
-            print("i, rou, cur_len, round_len:", i, rou, cur_len, round_len)
+            #print("i, rou, cur_len, round_len:", i, rou, cur_len, round_len)
 
             
         target[cur_len:] = IGNORE_INDEX
@@ -470,7 +470,7 @@ def preprocess_llama_3(
                     f"WARNING: tokenization mismatch: {cur_len} vs. {total_len}."
                     f" (ignored)"
                 )
-        print("------------------------------")
+        #print("------------------------------")
         
     return dict(
         input_ids=input_ids,
