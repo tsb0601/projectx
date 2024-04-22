@@ -424,9 +424,9 @@ def preprocess_llama_3(
         total_len = int(target.ne(tokenizer.pad_token_id).sum())
 
         rounds = conversation.split("<|eot_id|>")
-        print("Conversation is:", conversation, '\n')
-        print("It is seperated to:", rounds)
-        print("------------------------------")
+        #print("Conversation is:", conversation, '\n')
+        #print("It is seperated to:", rounds)
+        #print("------------------------------")
         cur_len = 0
         #target[:cur_len] = IGNORE_INDEX
         for i, rou in enumerate(rounds):
@@ -437,19 +437,22 @@ def preprocess_llama_3(
             
             # System Prompt
             if i == 0:
-                round_len = len(tokenizer_image_token(rou, tokenizer))
+                round_len = len(tokenizer(rou).input_ids)
                 # Don't predict system prompt
                 target[cur_len : cur_len + round_len] = IGNORE_INDEX
                 cur_len += round_len
             # User Prompt
             elif i % 2 == 1:
-                round_len = len(tokenizer_image_token(rou, tokenizer))
+                if i==1 and has_image:
+                    round_len = len(tokenizer_image_token(rou, tokenizer))
+                else:
+                    round_len = len(tokenizer(rou).input_ids)
                 # Don't predict system prompt
                 target[cur_len : cur_len + round_len] = IGNORE_INDEX
                 cur_len += round_len
             # Model Reponse
             elif i % 2 == 0:
-                round_len = len(tokenizer_image_token(rou, tokenizer))
+                round_len = len(tokenizer(rou).input_ids)
                 # Don't predict system prompt
                 target[cur_len : cur_len + 3] = IGNORE_INDEX
                 cur_len += round_len
