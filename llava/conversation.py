@@ -10,6 +10,8 @@ class SeparatorStyle(Enum):
     MPT = auto()
     PLAIN = auto()
     LLAMA_2 = auto()
+    LLAMA_3 = auto()
+    MISTRAL = auto()
     GEMMA = auto()
 
 
@@ -39,6 +41,8 @@ class Conversation:
                 messages.insert(1, (self.roles[1], "Received."))
             else:
                 messages[0] = (init_role, "<image>\n" + init_msg)
+        
+        #print("message is", messages)
 
         if self.sep_style == SeparatorStyle.SINGLE:
             ret = self.system + self.sep
@@ -86,6 +90,50 @@ class Conversation:
                         ret += self.sep + message
                     else:
                         ret += " " + message + " " + self.sep2
+                else:
+                    ret += ""
+            ret = ret.lstrip(self.sep)
+        elif self.sep_style == SeparatorStyle.LLAMA_3:
+            wrap_sys = lambda msg: f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>{msg}<|eot_id|>" if len(msg) > 0 else msg
+            wrap_inst_user = lambda msg: f"<|start_header_id|>user<|end_header_id|>{msg}<|eot_id|>"
+            wrap_inst_assistant = lambda msg: f"<|start_header_id|>assistant<|end_header_id|>{msg}<|eot_id|>"
+            ret = ""
+
+            for i, (role, message) in enumerate(messages):
+                if i == 0:
+                    assert message, "first message should not be none"
+                    assert role == self.roles[0], "first message should come from user"
+                if message:
+                    if type(message) is tuple:
+                        message, _, _ = message
+                    if i == 0: ret += wrap_sys(self.system)
+
+                    if i % 2 == 0:
+                        message = wrap_inst_user(message)
+                        ret += message
+                    else:
+                        message = wrap_inst_assistant(message)
+                        ret += message
+                else:
+                    ret += ""
+        elif self.sep_style == SeparatorStyle.MISTRAL:
+            wrap_sys = lambda msg: f"<<SYS>>\n{msg}\n<</SYS>>\n\n" if len(msg) > 0 else msg
+            wrap_inst = lambda msg: f"[INST] {msg} [/INST]"
+            ret = ""  # bos token
+
+            for i, (role, message) in enumerate(messages):
+                if i == 0:
+                    assert message, "first message should not be none"
+                    assert role == self.roles[0], "first message should come from user"
+                if message:
+                    if type(message) is tuple:
+                        message, _, _ = message
+                    if i == 0: message = wrap_sys(self.system) + message
+                    if i % 2 == 0:
+                        message = wrap_inst(message)
+                        ret += self.sep + message
+                    else:
+                        ret += message + self.sep2
                 else:
                     ret += ""
             ret = ret.lstrip(self.sep)
@@ -271,20 +319,16 @@ conv_vicuna_v1 = Conversation(
     sep2="</s>",
 )
 
-conv_vicuna_yi = Conversation(
-    system="A chat between a curious user and an artificial intelligence assistant. "
-    "The assistant gives helpful, detailed, and polite answers to the user's questions.",
-    roles=("USER", "ASSISTANT"),
-    version="v1",
+conv_vicuna_cambrian = Conversation(
+    system="",
+    roles=("Human", "GPT"),
+    version="vicuna_cambrian",
     messages=(),
     offset=0,
     sep_style=SeparatorStyle.TWO,
-    sep=" ",
-    sep2="<|im_end|>",
+    sep="\n",
+    sep2="\n\n",
 )
-
-
-
 
 conv_llama_2 = Conversation(
     system="""You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe.  Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature.
@@ -367,7 +411,6 @@ conv_llava_v0_mmtag = Conversation(
     version="v0_mmtag",
 )
 
-
 conv_llava_v1 = Conversation(
     system="A chat between a curious human and an artificial intelligence assistant. "
            "The assistant gives helpful, detailed, and polite answers to the human's questions.",
@@ -379,9 +422,6 @@ conv_llava_v1 = Conversation(
     sep=" ",
     sep2="</s>",
 )
-
-
-
 
 conv_llava_cohere = Conversation(
     system="A chat between a curious human and an artificial intelligence assistant. "
@@ -419,6 +459,17 @@ conv_mistral_instruct = Conversation(
     sep2="</s>",
 )
 
+conv_mistral_v2 = Conversation(
+    system="",
+    roles=("USER", "ASSISTANT"),  # NOTE: these are not injected into the prompt. does not matter
+    version="mistral_v2",
+    messages=(),
+    offset=0,
+    sep_style=SeparatorStyle.MISTRAL,
+    sep="",
+    sep2="</s>",
+)
+
 conv_chatml_direct = Conversation(
     system="""<|im_start|>system
 Answer the questions.""",
@@ -430,68 +481,38 @@ Answer the questions.""",
     sep="<|im_end|>",
 )
 
-conv_chatml_direct_ft = Conversation(
-    system="""<|im_start|>system\nAnswer the questions.""",
-    roles=("<|im_start|>user\n", "<|im_start|>assistant\n"),
-    version="mpt",
-    messages=(),
-    offset=0,
-    sep_style=SeparatorStyle.MPT,
-    sep="<|im_end|>",
-)
 
-conv_cambrian_v1 = Conversation(
-    system="You are Cambrian, a highly intelligent multimodal AI trained by NYU Vision X. "
-    "As a multimodal AI, you have the ability to process and analyze images. Whenever an image is present in the conversation, very carefully examine it and consider its content when formulating your response."
-    "You should give concise responses to very simple questions, but provide thorough responses to more complex and open-ended questions. ",
+conv_llama_3 = Conversation(
+    system="""You are Cambrian, a highly intelligent multimodal AI trained by NYU Vision X. 
+    As a multimodal AI, you have the ability to process and analyze images. Whenever an image is present in the conversation, very carefully examine it and consider its content when formulating your response.
+    You should give concise responses to very simple questions, but provide thorough responses to more complex and open-ended questions. """,
     roles=("USER", "ASSISTANT"),
-    version="v1",
+    version="llama_v3",
     messages=(),
     offset=0,
-    sep_style=SeparatorStyle.TWO,
-    sep=" ",
-    sep2="</s>",
-)
-
-conv_cambrian_yi = Conversation(
-    system="<|im_start|>You are Cambrian, a highly intelligent multimodal AI trained by NYU Vision X. "
-    "As a multimodal AI, you have the ability to process and analyze images. Whenever an image is present in the conversation, very carefully examine it and consider its content when formulating your response."
-    "You should give concise responses to very simple questions, but provide thorough responses to more complex and open-ended questions. ",
-    roles=("<|im_start|>user\n", "<|im_start|>assistant\n"),
-    version="mpt",
-    messages=(),
-    offset=0,
-    sep_style=SeparatorStyle.MPT,
-    sep="<|im_end|>",
+    sep_style=SeparatorStyle.LLAMA_3,
+    sep="<|begin_of_text|>",
+    sep2="<|end_of_text|>",
 )
 
 
-#default_conversation = conv_llava_cohere
-
-
-# For Cambrian
-#default_conversation = conv_cambrian_v1
-
-
-# For Vicuna
-default_conversation = conv_vicuna_v1
-
-# For Yi
-#default_conversation = conv_chatml_direct
-#default_conversation = conv_cambrian_yi
-
+#default_conversation = conv_vicuna_v1
+default_conversation = conv_llama_3
 
 conv_templates = {
     "default": conv_vicuna_v0,
     "v0": conv_vicuna_v0,
     "v1": conv_vicuna_v1,
     "vicuna_v1": conv_vicuna_v1,
-    "coherev1": conv_llava_cohere,
+    "vicuna_cambrian": conv_vicuna_cambrian,
+    "cohere_v1": conv_llava_cohere,
     "llama_2": conv_llama_2,
+    "llama_3": conv_llama_3,
     "mistral_instruct": conv_mistral_instruct,
     "chatml_direct": conv_chatml_direct,
-    "chatml_direct_ft": conv_chatml_direct_ft,
     "mistral_direct": conv_chatml_direct,
+    "mistral_v2": conv_mistral_v2,
+
     "plain": conv_llava_plain,
     "v0_plain": conv_llava_plain,
     "llava_v0": conv_llava_v0,
