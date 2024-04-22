@@ -35,7 +35,7 @@ from llava.train.llava_trainer import LLaVATrainer
 from llava import conversation as conversation_lib
 
 from llava.model import *
-from llava.mm_utils import tokenizer_image_token
+from llava.mm_utils import tokenizer_image_token, tokenizer_image_token_llama3
 from llava.train.gcloud_rsync_callback import GCloudRsyncCallback
 
 from PIL import Image
@@ -401,7 +401,7 @@ def preprocess_llama_3(
     # Tokenize conversations
 
     if has_image:
-        input_ids = torch.stack([tokenizer_image_token(prompt, tokenizer, return_tensors='pt') for prompt in conversations], dim=0)
+        input_ids = torch.stack([tokenizer_image_token_llama3(prompt, tokenizer, return_tensors='pt') for prompt in conversations], dim=0)
     else:
         input_ids = tokenizer(
             conversations,
@@ -427,6 +427,7 @@ def preprocess_llama_3(
         print("Conversation is:", conversation, '\n')
         print("It is seperated to:", rounds)
         print("has_image is:", has_image)
+        print("total_len is:", total_len)
         
         cur_len = 0
         #target[:cur_len] = IGNORE_INDEX
@@ -445,7 +446,7 @@ def preprocess_llama_3(
             # User Prompt
             elif i % 2 == 1:
                 if i==1 and has_image:
-                    round_len = len(tokenizer_image_token(rou, tokenizer))
+                    round_len = len(tokenizer_image_token_llama3(rou, tokenizer))
                 else:
                     round_len = len(tokenizer(rou).input_ids)
                 # Don't predict system prompt
