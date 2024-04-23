@@ -494,8 +494,18 @@ conv_llama_3 = Conversation(
     sep="<|begin_of_text|>",
     sep2="<|end_of_text|>",
 )
+conv_chatml_direct = Conversation(
+    system="""<|im_start|>system
+Answer the questions.""",
+    roles=("<|im_start|>user\n", "<|im_start|>assistant\n"),
+    version="mpt",
+    messages=(),
+    offset=0,
+    sep_style=SeparatorStyle.MPT,
+    sep="<|im_end|>",
+)
 
-
+default_conversation = conv_chatml_direct
 default_conversation = conv_vicuna_v1
 #default_conversation = conv_llama_3
 

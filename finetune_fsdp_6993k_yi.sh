@@ -4,15 +4,16 @@ export PJRT_DEVICE=TPU
 export XLA_USE_BF16=0
 export WANDB_ENTITY=nyu-visionx
 export WANDB_PROJECT=llava
-export CKPT_NAME="yi-finetune-5565k"
+export CKPT_NAME="yi-finetune-6993k"
 
 
 python llava/train/train_tpu.py \
     --model_name_or_path /mnt/disks/storage/llm_ckpts/Nous-Hermes-2-Yi-34B \
     --version chatml_direct \
-    --data_path /mnt/disks/storage/data/finetune_data/5565kL.jsonl \
+    --data_path /mnt/disks/storage/data/finetune_data/6993kL.jsonl \
     --image_folder /mnt/disks/storage/data/finetune_data \
-    --vision_tower openai/clip-vit-large-patch14-336 \
+    --vision_tower siglip/CLIP-ViT-SO400M-14-384 \
+    --image_token_len 729 \
     --mm_projector_type mlp2x_gelu \
     --image_position 86 \
     --mm_vision_select_layer -2 \
@@ -23,14 +24,14 @@ python llava/train/train_tpu.py \
     --bf16 False \
     --output_dir ./checkpoints/$CKPT_NAME \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 4 \
+    --per_device_train_batch_size 6 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \
     --save_strategy "steps" \
     --save_steps 100000 \
     --save_total_limit 1 \
-    --learning_rate 4e-5 \
+    --learning_rate 5e-5 \
     --weight_decay 0. \
     --warmup_ratio 0.03 \
     --lr_scheduler_type "cosine" \
