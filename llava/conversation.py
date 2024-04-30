@@ -505,8 +505,8 @@ Answer the questions.""",
     sep="<|im_end|>",
 )
 
-#default_conversation = conv_chatml_direct
-default_conversation = conv_vicuna_v1
+default_conversation = conv_chatml_direct
+#default_conversation = conv_vicuna_v1
 #default_conversation = conv_llama_3
 
 conv_templates = {
