@@ -3,7 +3,7 @@ export PJRT_DEVICE=TPU
 export XLA_USE_BF16=0
 export WANDB_ENTITY=nyu-visionx
 export WANDB_PROJECT=llava
-export CKPT_NAME="yi-finetune-6993k-pretrain"
+export CKPT_NAME="yi-pretrain"
 
 
 python llava/train/train_tpu.py \
