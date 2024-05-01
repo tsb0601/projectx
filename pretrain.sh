@@ -14,7 +14,6 @@ python llava/train/train_tpu.py \
     --vision_tower siglip/CLIP-ViT-SO400M-14-384 \
     --image_token_len 729 \
     --mm_projector_type mlp2x_gelu \
-    --image_position 86 \
     --tune_mm_mlp_adapter True \
     --mm_vision_select_layer -2 \
     --mm_use_im_start_end False \
