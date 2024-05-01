@@ -11,7 +11,7 @@ python llava/train/train_tpu.py \
     --version plain \
     --data_path /mnt/disks/storage/data/finetune_data/pretrain.jsonl \
     --image_folder /mnt/disks/storage/data/finetune_data \
-    ---vision_tower siglip/CLIP-ViT-SO400M-14-384 \
+    --vision_tower siglip/CLIP-ViT-SO400M-14-384 \
     --image_token_len 729 \
     --mm_projector_type mlp2x_gelu \
     --image_position 86 \
