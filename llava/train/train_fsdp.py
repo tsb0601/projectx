@@ -1249,7 +1249,7 @@ def prepare_multimodal_data(input_ids, labels, attention_mask, image_token_len=5
 
         image_token_indices = [-1] + torch.where(cur_input_ids == IMAGE_TOKEN_INDEX)[0].tolist() + [cur_input_ids.shape[0]]
 
-        print(image_token_indices)
+        # print(image_token_indices)
 
         cur_input_ids_im_replaced = []
         cur_labels_im_replaced = []
