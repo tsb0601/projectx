@@ -501,7 +501,7 @@ conv_chatml_direct = Conversation(
     messages=(),
     offset=0,
     sep_style=SeparatorStyle.MPT,
-    sep="<|im_end|>\n",
+    sep="<|im_end|>",
 )
 
 default_conversation = conv_chatml_direct
