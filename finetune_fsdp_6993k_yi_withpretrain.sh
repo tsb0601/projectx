@@ -15,7 +15,7 @@ python llava/train/train_tpu.py \
     --pretrain_mm_mlp_adapter /home/tsb/projectx/checkpoints/mm_projector.bin \
     --image_token_len 729 \
     --mm_projector_type mlp2x_gelu \
-    --image_position 88 \
+    --image_position 87 \
     --mm_vision_select_layer -2 \
     --mm_use_im_start_end False \
     --mm_use_im_patch_token False \
