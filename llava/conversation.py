@@ -506,6 +506,7 @@ conv_chatml_direct = Conversation(
 
 #default_conversation = conv_chatml_direct
 default_conversation = conv_vicuna_v1
+
 #default_conversation = conv_llama_3
 
 conv_templates = {
