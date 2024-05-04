@@ -122,8 +122,6 @@ class HybridVisionTower(BaseVisionTower):
 
     def forward(self, images):
         with torch.set_grad_enabled(self.unfreeze_mm_vision_tower):
-            raw_images = revert_preprocessing(images)
-
             output_images_features = []
             for i in range(1, len(self.model_names) + 1):
                 vision_tower = getattr(self, f"vision_tower_{i}")
