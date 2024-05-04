@@ -1361,10 +1361,14 @@ class DataCollatorForSupervisedDataset(object):
 
         if 'image' in instances[0]:
             images = [instance['image'] for instance in instances]
-            if all(x is not None and x.shape == images[0].shape for x in images):
-                batch['images'] = torch.stack(images)
-            else:
+            if type(images[0]) is list:
                 batch['images'] = images
+            else:
+
+                if all(x is not None and x.shape == images[0].shape for x in images):
+                    batch['images'] = torch.stack(images)
+                else    :
+                    batch['images'] = images
 
         return batch
 
