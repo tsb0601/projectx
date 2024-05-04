@@ -127,7 +127,7 @@ class HybridVisionTower(BaseVisionTower):
             output_images_features = []
             for i in range(1, len(self.model_names) + 1):
                 vision_tower = getattr(self, f"vision_tower_{i}")
-                processed_images = [vision_tower.image_processor.preprocess(image, return_tensors='pt')["pixel_values"][0] for image in raw_images]
+                processed_images = [image[i-1] for image in images]
                 batch_tensor = torch.stack(processed_images)
                 #print("batch tensor", batch_tensor.shape)
                 image_features = vision_tower._forward(batch_tensor.to(device=self.device, dtype=self.dtype))

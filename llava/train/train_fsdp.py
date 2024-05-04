@@ -1104,8 +1104,11 @@ class LazySupervisedDataset(Dataset):
                         result = Image.new(pil_img.mode, (height, height), background_color)
                         result.paste(pil_img, ((height - width) // 2, 0))
                         return result
-                image = expand2square(image, tuple(int(x*255) for x in processor.image_mean))
-                image = processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
+                if type(processor) is list:
+                    image = [process.preprocess(expand2square(image, tuple(int(x*255) for x in process.image_mean)), return_tensors='pt')['pixel_values'][0]for process in processor]   
+                else:
+                    image = expand2square(image, tuple(int(x*255) for x in processor.image_mean))
+                    image = processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
             else:
                 image = processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
             sources = preprocess_multimodal(
@@ -1126,8 +1129,14 @@ class LazySupervisedDataset(Dataset):
             data_dict['image'] = image
         elif self.data_args.is_multimodal:
             # image does not exist in the data, but the model is multimodal
-            crop_size = self.data_args.image_processor.crop_size
-            data_dict['image'] = torch.zeros(3, crop_size['height'], crop_size['width'])
+            if type(self.data_args.image_processor) is list:
+                data_dict['image'] = []
+                for processor in self.data_args.image_processor:
+                    crop_size = processor.crop_size
+                    data_dict['image'].append(torch.zeros(3, crop_size['height'], crop_size['width']))
+            else:
+                crop_size = self.data_args.image_processor.crop_size
+                data_dict['image'] = torch.zeros(3, crop_size['height'], crop_size['width'])
         return data_dict
 
 
