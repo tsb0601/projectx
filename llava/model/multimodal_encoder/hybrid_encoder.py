@@ -19,24 +19,15 @@ from torchvision.utils import make_grid
 from PIL import Image
 
 def revert_preprocessing(images):
-    reverse_normalize = transforms.Normalize(mean=[-0.5/-0.5, -0.5/-0.5, -0.5/-0.5], std=[1/0.5, 1/0.5, 1/0.5])
-    
-    def convert_to_float32(tensor):
-        return tensor.to(torch.float32)
-    
-    reverse_transform = transforms.Compose([
-        reverse_normalize,
-        transforms.Lambda(convert_to_float32),
-        transforms.Lambda(lambda tensor: to_pil_image(tensor))
-    ])
+    def convert_to_pil(tensor):
+        return to_pil_image(tensor)
     
     reversed_images = []
     for image in images:
-        reversed_image = reverse_transform(image)
+        reversed_image = convert_to_pil(image)
         reversed_images.append(reversed_image)
     
     return reversed_images
-
 
 import os
 
@@ -112,11 +103,16 @@ class HybridVisionTower(BaseVisionTower):
         self._image_size = 384
         self._patch_size = 16
 
+        # preprocess = transforms.Compose([
+        #     transforms.Resize(size=(384, 384), interpolation=transforms.InterpolationMode.BICUBIC, max_size=None, antialias=True),
+        #     transforms.ToTensor(),
+        #     transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+        # ])
         preprocess = transforms.Compose([
-            transforms.Resize(size=(384, 384), interpolation=transforms.InterpolationMode.BICUBIC, max_size=None, antialias=True),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+            transforms.ToTensor()
         ])
+        
+
         self.image_processor = ProcessorWrapper(preprocess, height=self._image_size, width=self._image_size)
 
         for i in range(1, len(self.model_names) + 1):
@@ -124,7 +120,7 @@ class HybridVisionTower(BaseVisionTower):
 
         self.is_loaded = True
 
-    def _forward(self, images):
+    def forward(self, images):
         with torch.set_grad_enabled(self.unfreeze_mm_vision_tower):
             raw_images = revert_preprocessing(images)
 
@@ -133,6 +129,7 @@ class HybridVisionTower(BaseVisionTower):
                 vision_tower = getattr(self, f"vision_tower_{i}")
                 processed_images = [vision_tower.image_processor.preprocess(image, return_tensors='pt')["pixel_values"][0] for image in raw_images]
                 batch_tensor = torch.stack(processed_images)
+                #print("batch tensor", batch_tensor.shape)
                 image_features = vision_tower._forward(batch_tensor.to(device=self.device, dtype=self.dtype))
 
                 b, num_tokens, dim = image_features.shape
@@ -148,6 +145,7 @@ class HybridVisionTower(BaseVisionTower):
                 output_images_features.append(image_features)
 
             output_tensor = torch.cat(output_images_features, dim=-1)
+            #print("output", output_tensor.shape)
 
             return output_tensor
 
