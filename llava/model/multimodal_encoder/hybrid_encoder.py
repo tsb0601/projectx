@@ -113,7 +113,10 @@ class HybridVisionTower(BaseVisionTower):
         ])
         
 
-        self.image_processor = ProcessorWrapper(preprocess, height=self._image_size, width=self._image_size)
+        self.image_processor = []
+        for i in range(1, len(self.model_names) + 1):
+            vision_tower = getattr(self, f"vision_tower_{i}")
+            self.image_processor.append(vision_tower.image_processor)
 
         for i in range(1, len(self.model_names) + 1):
             getattr(self, f"vision_tower_{i}").requires_grad_(self.unfreeze_mm_vision_tower)
