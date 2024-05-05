@@ -21,6 +21,12 @@ class ClipVisionTower(BaseVisionTower):
         self.vision_tower = CLIPVisionModel.from_pretrained(self.vision_tower_name)
 
         self.vision_tower.requires_grad_(self.unfreeze_mm_vision_tower)
+
+        # Assign the output channels of the projection convolution as the hidden size
+        self._hidden_size = self.vision_tower.embeddings.patch_embeddings.projection.out_channels
+        # Assign the first value of the stride of the projection convolution as the patch size
+        self._patch_size = self.vision_tower.embeddings.patch_embeddings.projection.stride[0]
+
         self.is_loaded = True
 
         # Very Important for TorchXLA
