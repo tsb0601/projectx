@@ -27,6 +27,7 @@ class ClipVisionTower(BaseVisionTower):
 
         # Assign the patch size from the config
         self._patch_size = self.vision_tower.config.patch_size
+        
         self.is_loaded = True
 
         # Very Important for TorchXLA
