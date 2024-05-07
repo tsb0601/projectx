@@ -157,6 +157,12 @@ class OneStepSDPipeline(StableDiffusionPipeline):
 
 class DiffusionVisionTower(BaseVisionTower):
 
+    def _post_init(self):
+        if not self.delay_load:
+            self.load_model()
+        elif self.unfreeze_mm_vision_tower:
+            self.load_model()
+
     def __init__(self, vision_tower, args, delay_load=False):
         super(DiffusionVisionTower, self).__init__(vision_tower, args, delay_load)
 
