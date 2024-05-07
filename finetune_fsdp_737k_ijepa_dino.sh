@@ -11,7 +11,7 @@ python llava/train/train_tpu.py \
     --version v1 \
     --data_path /mnt/disks/storage/data/finetune_data/jsons/737k.jsonl \
     --image_folder /mnt/disks/storage/data/finetune_data \
-    --vision_tower ijepa-vit-g-16-and-facebook/dinov2-giant-res518 \
+    --vision_tower hybridmodel-ijepa-vit-g-16-and-facebook/dinov2-giant-res518 \
     --mm_projector_type mlp2x_gelu \
     --mm_vision_select_layer -2 \
     --mm_use_im_start_end False \
