@@ -13,6 +13,7 @@ from .midas_encoder import MiDaSVisionTower
 from .moco_encoder import MoCoVisionTower
 from .hybrid_encoder import HybridVisionTower
 from .supervised_vit_encoder import SupervisedViT_VisionTower
+from .diffusion_encoder import DiffusionVisionTower
 
 def build_vision_tower(vision_tower_cfg, **kwargs):
     vision_tower = getattr(vision_tower_cfg, 'mm_vision_tower', getattr(vision_tower_cfg, 'vision_tower', None))
@@ -38,6 +39,9 @@ def build_vision_tower(vision_tower_cfg, **kwargs):
     if "eva/clip" in vision_tower.lower():
         logger.info(f"Loading **EVA CLIP** Vision Tower: {vision_tower}")
         return EvaClipVisionTower(vision_tower, args=vision_tower_cfg, **kwargs)
+    if "diffusion" in vision_tower.lower():
+        logger.info(f"Loading **Diffusion** Vision Tower: {vision_tower}")
+        return DiffusionVisionTower(vision_tower, args=args)  
 
     if "ijepa" in vision_tower.lower():
         logger.info(f"Loading **IJepa** Vision Tower: {vision_tower}")

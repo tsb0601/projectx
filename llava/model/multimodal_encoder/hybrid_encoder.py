@@ -42,7 +42,7 @@ from .ijepa_encoder import IJepaVisionTower
 from .mae_encoder import MAEVisionTower
 from .midas_encoder import MiDaSVisionTower
 from .moco_encoder import MoCoVisionTower
-
+from .diffusion_encoder import DiffusionVisionTower
 from .supervised_vit_encoder import SupervisedViT_VisionTower
 
 def load_vision_model(vision_tower, args):
@@ -72,7 +72,10 @@ def load_vision_model(vision_tower, args):
         return MoCoVisionTower(vision_tower, args=args)
     if "supervised-vit" in vision_tower.lower():
         logger.info(f"Loading **Supervised** Vision Tower: {vision_tower}")
-        return SupervisedViT_VisionTower(vision_tower, args=args)     
+        return SupervisedViT_VisionTower(vision_tower, args=args)   
+    if "diffusion" in vision_tower.lower():
+        logger.info(f"Loading **Diffusion** Vision Tower: {vision_tower}")
+        return DiffusionVisionTower(vision_tower, args=args)  
     # dinov2
     if "dinov2" in vision_tower.lower():
         logger.info(f"Loading **DINO Vision Tower: {vision_tower}")
