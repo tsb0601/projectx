@@ -264,7 +264,7 @@ class DiffusionVisionTower(BaseVisionTower):
 
         self.image_processor = ProcessorWrapper(preprocess, height=self._image_size, width=self._image_size)
 
-        self.vision_tower.requires_grad_(self.unfreeze_mm_vision_tower)
+        #self.vision_tower.requires_grad_(self.unfreeze_mm_vision_tower)
         self.is_loaded = True
 
     def _forward(self, images):
