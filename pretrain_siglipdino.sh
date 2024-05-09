@@ -8,7 +8,7 @@ export CKPT_NAME="pretrain-siglip-dino"
 
 python llava/train/train_tpu.py \
     --model_name_or_path lmsys/vicuna-7b-v1.5 \
-    --version plain \
+    --version v1 \
     --data_path /mnt/disks/storage/data/finetune_data/pretrain.jsonl \
     --image_folder /mnt/disks/storage/data/finetune_data \
     --vision_tower hybridmodel-siglip/CLIP-ViT-SO400M-14-384-and-facebook/dinov2-giant-res384 \
