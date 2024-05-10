@@ -12,6 +12,7 @@ python llava/train/train_tpu.py \
     --data_path /mnt/disks/storage/data/finetune_data/jsons/737k.jsonl \
     --image_folder /mnt/disks/storage/data/finetune_data \
     --vision_tower hybridmodel-siglip/CLIP-ViT-SO400M-14-384-and-facebook/dinov2-giant-res518 \
+    --pretrain_mm_mlp_adapter mm_projector.bin \
     --mm_projector_type mlp2x_gelu \
     --mm_vision_select_layer -2 \
     --mm_use_im_start_end False \
