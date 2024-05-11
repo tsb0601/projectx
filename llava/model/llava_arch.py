@@ -160,31 +160,31 @@ class LlavaMetaForCausalLM(ABC):
             return input_ids, position_ids, attention_mask, past_key_values, None, labels
 
 
-		unpad = getattr(self.config, 'unpad', False)
-		image_features = self.encode_images(images)
-		if unpad:
-			height = width = self.get_vision_tower().num_patches_per_side
-			assert height * width == image_features.shape[1]
-			if IS_XLA_AVAILABLE:
-				image_features = image_features.view(image_features.shape[0], height, width, -1)
-				image_features = torch.cat((
-					image_features,
-					self.model.image_newline[None, None, None, :].expand(image_features.shape[0], height, 1, -1)
-				), dim=2)
-				image_features = image_features.flatten(1, 2)
-			else:
-				image_features_unpadded = []
-				for cur_image_feature, cur_image_size in zip(image_features, image_sizes):
-					cur_image_feature=cur_image_feature.permute(1, 0).view(-1, height, width)
-					cur_image_feature_unpadded = unpad_image(cur_image_feature, cur_image_size)
-					cur_image_feature_unpadded = torch.cat((
-								cur_image_feature_unpadded,
-								self.model.image_newline[:, None, None].expand(*cur_image_feature_unpadded.shape[:-1], 1).to(cur_image_feature_unpadded.device)
-							), dim=-1)
-					cur_image_feature_unpadded = cur_image_feature_unpadded.flatten(1, 2).transpose(0, 1)
-					image_features_unpadded.append(cur_image_feature_unpadded)
+        unpad = getattr(self.config, 'unpad', False)
+        image_features = self.encode_images(images)
+        if unpad:
+            height = width = self.get_vision_tower().num_patches_per_side
+            assert height * width == image_features.shape[1]
+            if IS_XLA_AVAILABLE:
+                image_features = image_features.view(image_features.shape[0], height, width, -1)
+                image_features = torch.cat((
+                    image_features,
+                    self.model.image_newline[None, None, None, :].expand(image_features.shape[0], height, 1, -1)
+                ), dim=2)
+                image_features = image_features.flatten(1, 2)
+            else:
+                image_features_unpadded = []
+                for cur_image_feature, cur_image_size in zip(image_features, image_sizes):
+                    cur_image_feature=cur_image_feature.permute(1, 0).view(-1, height, width)
+                    cur_image_feature_unpadded = unpad_image(cur_image_feature, cur_image_size)
+                    cur_image_feature_unpadded = torch.cat((
+                                cur_image_feature_unpadded,
+                                self.model.image_newline[:, None, None].expand(*cur_image_feature_unpadded.shape[:-1], 1).to(cur_image_feature_unpadded.device)
+                            ), dim=-1)
+                    cur_image_feature_unpadded = cur_image_feature_unpadded.flatten(1, 2).transpose(0, 1)
+                    image_features_unpadded.append(cur_image_feature_unpadded)
 
-				image_features = image_features_unpadded
+                image_features = image_features_unpadded
 
         # TODO: image start / end is not implemented here to support pretraining.
         if getattr(self.config, 'tune_mm_mlp_adapter', False) and getattr(self.config, 'mm_use_im_start_end', False):
