@@ -1090,6 +1090,8 @@ class LazySupervisedDataset(Dataset):
             
             try:
                 image = Image.open(os.path.join(image_folder, image_file)).convert('RGB')
+                image_size = image.size
+
             except:
                 return self.__getitem__(0)
 
@@ -1106,6 +1108,7 @@ class LazySupervisedDataset(Dataset):
                         result = Image.new(pil_img.mode, (height, height), background_color)
                         result.paste(pil_img, ((height - width) // 2, 0))
                         return result
+                
                 if type(processor) is list:
                     image = [process.preprocess(expand2square(image, tuple(int(x*255) for x in process.image_mean)), return_tensors='pt')['pixel_values'][0]for process in processor]   
                 else:
@@ -1129,8 +1132,12 @@ class LazySupervisedDataset(Dataset):
         # image exist in the data
         if has_image:
             data_dict['image'] = image
+            data_dict['image_size'] = image_size
+
         elif self.data_args.is_multimodal:
             # image does not exist in the data, but the model is multimodal
+            data_dict['image_size'] = (crop_size['height'], crop_size['width'])
+
             if type(self.data_args.image_processor) is list:
                 data_dict['image'] = []
                 for processor in self.data_args.image_processor:
