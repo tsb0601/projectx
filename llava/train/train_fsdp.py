@@ -1367,7 +1367,7 @@ class DataCollatorForSupervisedDataset(object):
     """Collate examples for supervised fine-tuning."""
 
     tokenizer: transformers.PreTrainedTokenizer
-    image_token_len: int = 576
+    image_token_len: int = 576  # (336 // 14)**2
     image_position: int = 35
     unpad: bool = False
 
@@ -1380,9 +1380,9 @@ class DataCollatorForSupervisedDataset(object):
         max_length = self.tokenizer.model_max_length
 
         padding_side = self.tokenizer.padding_side 
-        
-        #("Pad token id is", self.tokenizer.pad_token_id)
-        
+
+        print_rank0("Pad token id is", self.tokenizer.pad_token_id)
+
         if padding_side == "left":
             input_ids = [t[:max_length] if t.shape[0] >= max_length else torch.nn.functional.pad(t, (max_length - t.shape[0], 0), 'constant', self.tokenizer.pad_token_id) for t in input_ids]
             labels = [t[:max_length] if t.shape[0] >= max_length else torch.nn.functional.pad(t, ( max_length - t.shape[0], 0), 'constant', IGNORE_INDEX) for t in labels]
@@ -1392,7 +1392,7 @@ class DataCollatorForSupervisedDataset(object):
 
         input_ids = torch.stack(input_ids)
         labels = torch.stack(labels)
-        attention_mask= input_ids.ne(self.tokenizer.pad_token_id)
+        attention_mask = input_ids.ne(self.tokenizer.pad_token_id)
         # insert dummy image
         for i in range(len(input_ids)):
             if (input_ids[i] == IMAGE_TOKEN_INDEX).sum() == 0:
@@ -1410,6 +1410,11 @@ class DataCollatorForSupervisedDataset(object):
                 cur_attention_mask_tmp[image_position+1:] = attention_mask[i, image_position:-1]
                 cur_attention_mask_tmp[image_position] = False
                 attention_mask[i] = cur_attention_mask_tmp
+        image_sizes = [instance['image_size'] for instance in instances]
+
+        # logger.error(f"Image sizes: {image_sizes}")
+
+        # new_input_ids, new_labels, new_attention_mask, new_position_ids = prepare_multimodal_data(input_ids, labels, attention_mask, image_token_len, max_length)
         new_input_ids, new_labels, new_attention_mask, new_position_ids = prepare_multimodal_data(input_ids, labels, attention_mask, image_sizes, image_token_len, max_length, unpad=self.unpad)
         batch = dict(
             input_ids=new_input_ids,
@@ -1420,14 +1425,17 @@ class DataCollatorForSupervisedDataset(object):
 
         if 'image' in instances[0]:
             images = [instance['image'] for instance in instances]
-            if type(images[0]) is list:
-                batch['images'] = images
+            # image_types = [type(image) for image in images]
+            # num_is_none = sum(x is None for x in images)
+            # logger.warning(f"# images = None: {num_is_none}")
+            # all_same_type = all(x == image_types[0] for x in image_types)
+            # logger.error(f"Image type: {image_types[0]} x {len(images)}. All same type: {all_same_type}")
+            # image_sizes = [image.shape for image in images if image is not None]
+            # logger.error(f"Image sizes: {image_sizes}")
+            if all(x is not None and x.shape == images[0].shape for x in images):
+                batch['images'] = torch.stack(images)
             else:
-
-                if all(x is not None and x.shape == images[0].shape for x in images):
-                    batch['images'] = torch.stack(images)
-                else    :
-                    batch['images'] = images
+                batch['images'] = images
 
         return batch
 
