@@ -84,6 +84,8 @@ class DataArguments:
     image_aspect_ratio: str = 'square'
     image_token_len: int = 576
     image_position: int = 35
+    unpad: bool = False
+
 
 
 @dataclass
@@ -1247,7 +1249,49 @@ class LazySupervisedDataset(Dataset):
 #         return data_dict
 
 
-def prepare_multimodal_data(input_ids, labels, attention_mask, image_token_len=576, max_length=2048):
+
+def get_padding_offset(cur_size, original_size):
+    cur_w, cur_h = cur_size
+    original_w, original_h = original_size
+
+    original_aspect_ratio = original_w / original_h
+    current_aspect_ratio = cur_w / cur_h
+
+    if original_aspect_ratio > current_aspect_ratio:
+        scale_factor = cur_w / original_w
+        new_height = int(original_h * scale_factor)
+        padding = (cur_h - new_height) // 2
+        return 0, 0, padding, padding
+    else:
+        scale_factor = cur_h / original_h
+        new_width = int(original_w * scale_factor)
+        padding = (cur_w - new_width) // 2
+        return padding, padding, 0, 0
+
+
+def prepare_image_info(image_size, image_token_len, unpad=False):
+    num_tokens_per_side = int(image_token_len**0.5)
+    if unpad:
+        # for the newline embedding
+        attention_mask = torch.ones(num_tokens_per_side, num_tokens_per_side+1, dtype=torch.bool)
+    else:
+        attention_mask = torch.ones(num_tokens_per_side, num_tokens_per_side, dtype=torch.bool)
+    left_offset, right_offset, top_offset, bottom_offset = get_padding_offset((num_tokens_per_side, num_tokens_per_side), image_size)
+    if unpad:
+        if left_offset > 0:
+            attention_mask[:, :left_offset] = 0
+        if right_offset > 0:
+            attention_mask[:, -right_offset-1:-1] = 0
+        if top_offset > 0:
+            attention_mask[:top_offset, :]=0
+        if bottom_offset > 0:
+            attention_mask[-bottom_offset:, :] = 0
+    attention_mask = attention_mask.flatten()
+    position_ids = attention_mask.cumsum(0)-1
+    return attention_mask, position_ids
+
+
+def prepare_multimodal_data(input_ids, labels, attention_mask, image_sizes, image_token_len=576, max_length=2048, unpad=False):
     input_ids_im_replaced = []
     labels_im_replaced = []
     attention_mask_im_replaced = []
@@ -1255,16 +1299,14 @@ def prepare_multimodal_data(input_ids, labels, attention_mask, image_token_len=5
     # insert the padding tokens to the places of image so we can embed them together
     for batch_idx, cur_input_ids in enumerate(input_ids):
         num_images = (cur_input_ids == IMAGE_TOKEN_INDEX).sum()
-
+        image_size = image_sizes[batch_idx]
         image_token_indices = [-1] + torch.where(cur_input_ids == IMAGE_TOKEN_INDEX)[0].tolist() + [cur_input_ids.shape[0]]
-
-        # print(image_token_indices)
 
         cur_input_ids_im_replaced = []
         cur_labels_im_replaced = []
         cur_attention_mask_im_replaced = []
         cur_position_ids_im_replaced = []
-        
+
         cur_labels = labels[batch_idx]
         cur_attention_mask = attention_mask[batch_idx]
         index = 0
@@ -1275,23 +1317,39 @@ def prepare_multimodal_data(input_ids, labels, attention_mask, image_token_len=5
             cur_attention_mask_im_replaced.append(cur_attention_mask[image_token_indices[i]+1:image_token_indices[i+1]])
             cur_position_ids_im_replaced.append(torch.arange(index, index+image_token_indices[i+1]-(image_token_indices[i]+1), dtype=torch.long, device=cur_input_ids.device))
             index += image_token_indices[i+1]-(image_token_indices[i]+1)
-            
+
             if i < len(image_token_indices) - 2:
-                cur_input_ids_im_replaced.append(torch.full((image_token_len-1,), 0, device=cur_input_ids.device, dtype=cur_input_ids.dtype))
-                cur_labels_im_replaced.append(torch.full((image_token_len,), IGNORE_INDEX, device=cur_labels.device, dtype=cur_labels.dtype))
-                if cur_attention_mask[image_token_indices[i+1]]:    
-                    cur_attention_mask_im_replaced.append(torch.full((image_token_len,), 1, device=cur_attention_mask.device, dtype=cur_attention_mask.dtype))
-                    cur_position_ids_im_replaced.append(torch.arange(index, index+image_token_len, dtype=torch.long, device=cur_input_ids.device))
-                    index += image_token_len
+                if unpad:
+                    num_tokens_per_side = int(image_token_len**0.5)
+                    image_token_len_with_newline = image_token_len + num_tokens_per_side
+                    cur_input_ids_im_replaced.append(torch.full((image_token_len_with_newline-1,), 0, device=cur_input_ids.device, dtype=cur_input_ids.dtype))
+                    cur_labels_im_replaced.append(torch.full((image_token_len_with_newline,), IGNORE_INDEX, device=cur_labels.device, dtype=cur_labels.dtype))
                 else:
-                    cur_attention_mask_im_replaced.append(torch.full((image_token_len,), 0, device=cur_attention_mask.device, dtype=cur_attention_mask.dtype))
-                    cur_position_ids_im_replaced.append(torch.full((image_token_len,), 0, device=cur_input_ids.device, dtype=torch.long))
-        
+                    cur_input_ids_im_replaced.append(torch.full((image_token_len-1,), 0, device=cur_input_ids.device, dtype=cur_input_ids.dtype))
+                    cur_labels_im_replaced.append(torch.full((image_token_len,), IGNORE_INDEX, device=cur_labels.device, dtype=cur_labels.dtype))
+
+                cur_im_attention_mask, cur_im_position_ids = prepare_image_info(image_size, image_token_len, unpad=unpad)
+                cur_im_position_ids += index
+
+                if cur_attention_mask[image_token_indices[i+1]]:	
+                    cur_attention_mask_im_replaced.append(cur_im_attention_mask)
+                    cur_position_ids_im_replaced.append(cur_im_position_ids.to(torch.long))
+                    index = cur_im_position_ids.max()+1
+                else:
+                    if unpad:
+                        num_tokens_per_side = int(image_token_len**0.5)
+                        image_token_len_with_newline = image_token_len + num_tokens_per_side
+                        cur_attention_mask_im_replaced.append(torch.full((image_token_len_with_newline,), 0, device=cur_attention_mask.device, dtype=cur_attention_mask.dtype))
+                        cur_position_ids_im_replaced.append(torch.full((image_token_len_with_newline,), 0, device=cur_input_ids.device, dtype=torch.long))
+                    else:
+                        cur_attention_mask_im_replaced.append(torch.full((image_token_len,), 0, device=cur_attention_mask.device, dtype=cur_attention_mask.dtype))
+                        cur_position_ids_im_replaced.append(torch.full((image_token_len,), 0, device=cur_input_ids.device, dtype=torch.long))
+
         input_ids_im_replaced.append(torch.cat(cur_input_ids_im_replaced))
         labels_im_replaced.append(torch.cat(cur_labels_im_replaced))
         attention_mask_im_replaced.append(torch.cat(cur_attention_mask_im_replaced))
         position_ids_im_replaced.append(torch.cat(cur_position_ids_im_replaced))
-    
+
     # Truncate sequences to max length as image embeddings can make the sequence longer
     new_input_ids = [x[0:max_length] for x in input_ids_im_replaced]
     new_labels = [x[0:max_length] for x in labels_im_replaced]
@@ -1311,6 +1369,7 @@ class DataCollatorForSupervisedDataset(object):
     tokenizer: transformers.PreTrainedTokenizer
     image_token_len: int = 576
     image_position: int = 35
+    unpad: bool = False
 
     def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
         image_token_len = self.image_token_len
@@ -1351,7 +1410,7 @@ class DataCollatorForSupervisedDataset(object):
                 cur_attention_mask_tmp[image_position+1:] = attention_mask[i, image_position:-1]
                 cur_attention_mask_tmp[image_position] = False
                 attention_mask[i] = cur_attention_mask_tmp
-        new_input_ids, new_labels, new_attention_mask, new_position_ids = prepare_multimodal_data(input_ids, labels, attention_mask, image_token_len, max_length)
+        new_input_ids, new_labels, new_attention_mask, new_position_ids = prepare_multimodal_data(input_ids, labels, attention_mask, image_sizes, image_token_len, max_length, unpad=self.unpad)
         batch = dict(
             input_ids=new_input_ids,
             labels=new_labels,
@@ -1382,7 +1441,8 @@ def make_supervised_data_module(tokenizer: transformers.PreTrainedTokenizer,
     data_collator = DataCollatorForSupervisedDataset(
         tokenizer=tokenizer,
         image_token_len=data_args.image_token_len,
-        image_position=data_args.image_position
+        image_position=data_args.image_position,
+        unpad=data_args.unpad,
     )
     return dict(train_dataset=train_dataset,
                 eval_dataset=None,
@@ -1856,6 +1916,8 @@ def train(INDEX, attn_implementation=None):
             model_args=model_args,
             fsdp=training_args.fsdp
         )
+        model_args.unpad = data_args.unpad
+
         model.config.unfreeze_mm_vision_tower = training_args.unfreeze_mm_vision_tower
 
         vision_tower = model.get_vision_tower()
@@ -1899,6 +1961,8 @@ def train(INDEX, attn_implementation=None):
         model.config.mm_use_im_patch_token = model_args.mm_use_im_patch_token
         model.initialize_vision_tokenizer(model_args, tokenizer=tokenizer)
         #logger.info("Vision modules initialized.")
+        model.config.unpad = data_args.unpad
+
 
     if training_args.bits in [4, 8]:
         #logger.info(f"Initializing model in {training_args.bits}bit")
