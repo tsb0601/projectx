@@ -13,6 +13,14 @@ moderation_msg = "YOUR INPUT VIOLATES OUR CONTENT MODERATION GUIDELINES. PLEASE 
 
 handler = None
 
+# TODO: move elsewhere?
+IS_XLA_AVAILABLE = False
+try:
+    import torch_xla
+    IS_XLA_AVAILABLE = True
+except ImportError:
+    pass
+
 
 def build_logger(logger_name, logger_filename):
     global handler
@@ -94,9 +102,10 @@ def disable_torch_init():
     """
     Disable the redundant torch default initialization to accelerate model creation.
     """
-    import torch
-    setattr(torch.nn.Linear, "reset_parameters", lambda self: None)
-    setattr(torch.nn.LayerNorm, "reset_parameters", lambda self: None)
+    # import torch
+    # setattr(torch.nn.Linear, "reset_parameters", lambda self: None)
+    # setattr(torch.nn.LayerNorm, "reset_parameters", lambda self: None)
+    # disable_torch_init()  # DO NOT ENABLE THIS: KILLS PERFORMANCE
 
 
 def violates_moderation(text):
