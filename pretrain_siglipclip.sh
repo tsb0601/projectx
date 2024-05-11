@@ -3,7 +3,7 @@ export PJRT_DEVICE=TPU
 export XLA_USE_BF16=0
 export WANDB_ENTITY=nyu-visionx
 export WANDB_PROJECT=llava
-export CKPT_NAME="pretrain-siglip-clip"
+export CKPT_NAME="pretrain-siglip-clip-unpad"
 
 
 python llava/train/train_tpu.py \

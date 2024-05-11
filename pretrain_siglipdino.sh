@@ -3,7 +3,7 @@ export PJRT_DEVICE=TPU
 export XLA_USE_BF16=0
 export WANDB_ENTITY=nyu-visionx
 export WANDB_PROJECT=llava
-export CKPT_NAME="pretrain-siglip-dino"
+export CKPT_NAME="pretrain-siglip-dino-unpad"
 
 
 python llava/train/train_tpu.py \
@@ -11,7 +11,7 @@ python llava/train/train_tpu.py \
     --version v1 \
     --data_path /mnt/disks/storage/data/finetune_data/pretrain.jsonl \
     --image_folder /mnt/disks/storage/data/finetune_data \
-    --vision_tower hybridmodel-siglip/CLIP-ViT-SO400M-14-384-and-facebook/dinov2-giant-res384 \
+    --vision_tower hybridmodel-siglip/CLIP-ViT-SO400M-14-384-and-facebook/dinov2-giant-res378 \
     --mm_projector_type mlp2x_gelu \
     --tune_mm_mlp_adapter True \
     --mm_vision_select_layer -2 \
