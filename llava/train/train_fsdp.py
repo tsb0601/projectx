@@ -1432,18 +1432,14 @@ class DataCollatorForSupervisedDataset(object):
 
         if 'image' in instances[0]:
             images = [instance['image'] for instance in instances]
-            # image_types = [type(image) for image in images]
-            # num_is_none = sum(x is None for x in images)
-            # logger.warning(f"# images = None: {num_is_none}")
-            # all_same_type = all(x == image_types[0] for x in image_types)
-            # logger.error(f"Image type: {image_types[0]} x {len(images)}. All same type: {all_same_type}")
-            # image_sizes = [image.shape for image in images if image is not None]
-            # logger.error(f"Image sizes: {image_sizes}")
-            if all(x is not None and x.shape == images[0].shape for x in images):
-                batch['images'] = torch.stack(images)
-            else:
+            if type(images[0]) is list:
                 batch['images'] = images
+            else:
 
+                if all(x is not None and x.shape == images[0].shape for x in images):
+                    batch['images'] = torch.stack(images)
+                else    :
+                    batch['images'] = images
         return batch
 
 
