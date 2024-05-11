@@ -159,7 +159,7 @@ class LlavaMetaForCausalLM(ABC):
         if vision_tower is None or images is None or input_ids.shape[1] == 1:
             return input_ids, position_ids, attention_mask, past_key_values, None, labels
 
-       
+
 		unpad = getattr(self.config, 'unpad', False)
 		image_features = self.encode_images(images)
 		if unpad:
