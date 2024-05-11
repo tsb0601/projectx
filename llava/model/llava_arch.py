@@ -147,9 +147,18 @@ class LlavaMetaForCausalLM(ABC):
         return self.get_model().get_vision_tower()
 
     def encode_images(self, images):
-        image_features = self.get_model().get_vision_tower()(images)  # (batch_size, image_token_len, mm_hidden_size)
-        image_features = self.get_model().mm_projector(image_features).to(images.dtype)  # (batch_size, image_token_len, hidden_size)
-        return image_features
+		image_features = self.get_model().get_vision_tower()(images)
+		#image_features = self.get_model().resampler(image_features, languages).to(images.dtype)
+		if type(images) is list:
+			if type(images[0]) is list:
+				dtype = images[0][0].dtype
+			else:
+				dtype = images[0].dtype
+		else:
+			dtype = images.dtype
+
+		image_features = self.get_model().mm_projector(image_features).to(dtype)
+		return image_features
 
     def prepare_inputs_labels_for_multimodal(
         self, input_ids, position_ids, attention_mask, past_key_values, labels,
