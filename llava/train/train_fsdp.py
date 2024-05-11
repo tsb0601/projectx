@@ -1912,11 +1912,13 @@ def train(INDEX, attn_implementation=None):
     if model_args.vision_tower is not None:
         #logger.info("Initializing vision modules...")
         model_args.unfreeze_mm_vision_tower = training_args.unfreeze_mm_vision_tower
+        model_args.unpad = data_args.unpad
+
+
         model.get_model().initialize_vision_modules(
             model_args=model_args,
             fsdp=training_args.fsdp
         )
-        model_args.unpad = data_args.unpad
 
         model.config.unfreeze_mm_vision_tower = training_args.unfreeze_mm_vision_tower
 
