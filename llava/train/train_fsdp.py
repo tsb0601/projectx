@@ -215,9 +215,6 @@ def safe_save_model_for_hf_trainer(trainer: transformers.Trainer,
         if trainer.args.local_rank == 0 or trainer.args.local_rank == -1:
             trainer.model.config.save_pretrained(output_dir)
 
-        if not IS_XLA_AVAILABLE:
-            raise NotImplementedError("Only XLA is supported for now.")
-
         import torch_xla.core.xla_model as xm
         ckpt_prefix = os.path.join(output_dir, "mm_projector")
 
