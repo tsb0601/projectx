@@ -4,20 +4,21 @@ export PJRT_DEVICE=TPU
 export XLA_USE_BF16=0
 export WANDB_ENTITY=nyu-visionx
 export WANDB_PROJECT=llava
-export CKPT_NAME="TPU-llava-v1.5-7b-finetune-737k-hybrid-dino384-siglip-withpretrain"
+export CKPT_NAME="TPU-llava-v1.5-7b-finetune-737k-hybrid-dino376-siglip-withpretrain-unpad"
 
 python llava/train/train_tpu.py \
     --model_name_or_path lmsys/vicuna-7b-v1.5 \
     --version v1 \
     --data_path /mnt/disks/storage/data/finetune_data/jsons/737k.jsonl \
     --image_folder /mnt/disks/storage/data/finetune_data \
-    --vision_tower hybridmodel-siglip/CLIP-ViT-SO400M-14-384-and-facebook/dinov2-giant-res384 \
+    --vision_tower hybridmodel-siglip/CLIP-ViT-SO400M-14-384-and-facebook/dinov2-giant-res378 \
     --pretrain_mm_mlp_adapter mm_projector.bin \
     --mm_projector_type mlp2x_gelu \
     --mm_vision_select_layer -2 \
     --mm_use_im_start_end False \
     --mm_use_im_patch_token False \
     --image_aspect_ratio pad \
+    --unpad True \
     --group_by_modality_length True \
     --bf16 False \
     --output_dir ./checkpoints/$CKPT_NAME \
