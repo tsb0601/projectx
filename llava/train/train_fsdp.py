@@ -207,19 +207,23 @@ def safe_save_model_for_hf_trainer(trainer: transformers.Trainer,
 
     if getattr(trainer.args, "tune_mm_mlp_adapter", False):
         # Only save Adapter
-        keys_to_match = ['mm_projector']
+        keys_to_match = ['mm_projector', 'image_newline']
         if getattr(trainer.args, "use_im_start_end", False):
             keys_to_match.extend(['embed_tokens', 'embed_in'])
 
         weight_to_save = get_mm_adapter_state_maybe_zero_3(trainer.model.named_parameters(), keys_to_match)
         if trainer.args.local_rank == 0 or trainer.args.local_rank == -1:
             trainer.model.config.save_pretrained(output_dir)
+
+        if not IS_XLA_AVAILABLE:
+            raise NotImplementedError("Only XLA is supported for now.")
+
         import torch_xla.core.xla_model as xm
         ckpt_prefix = os.path.join(output_dir, "mm_projector")
-        
+
         os.makedirs(output_dir, exist_ok=True)
         rank = xm.get_ordinal()
-        print(rank)
+        print(f"rank: {rank}")
         world_size = xm.xrt_world_size()
         ckpt_path = f'{ckpt_prefix}_rank-{rank:08d}-of-{world_size:08d}.pth'
         ckpt = {
@@ -229,6 +233,11 @@ def safe_save_model_for_hf_trainer(trainer: transformers.Trainer,
         os.makedirs(os.path.dirname(ckpt_path), exist_ok=True)
         xm.save(ckpt, ckpt_path, master_only=False)
         print(f'checkpoint saved to {ckpt_path}\n', end='')
+        return
+
+    if trainer.deepspeed:
+        torch.cuda.synchronize()
+        trainer.save_model(output_dir)
         return
     # if getattr(trainer.args, "tune_mm_mlp_adapter", False):
     #     # Only save Adapter
