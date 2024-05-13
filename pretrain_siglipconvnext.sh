@@ -11,7 +11,7 @@ python llava/train/train_tpu.py \
     --version v1 \
     --data_path /mnt/disks/storage/data/finetune_data/pretrain.jsonl \
     --image_folder /mnt/disks/storage/data/finetune_data \
-    --vision_tower hybridmodel-siglip/CLIP-ViT-SO400M-14-384-and-clip-convnext-res512-interp576 \
+    --vision_tower hybridmodel-siglip/CLIP-ViT-SO400M-14-384-and-clip-convnext-res1024-interp576 \
     --mm_projector_type mlp2x_gelu \
     --tune_mm_mlp_adapter True \
     --mm_vision_select_layer -2 \
