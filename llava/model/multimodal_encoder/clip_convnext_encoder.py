@@ -130,8 +130,9 @@ class CLIPConvNextTower(BaseVisionTower):
         """
         with torch.set_grad_enabled(self.unfreeze_mm_vision_tower):
             image_forward_outs = self.vision_tower.forward_features(images.to(device=self.device, dtype=self.dtype))
-            image_features = self.interpolate(image_forward_outs)
-            return image_features
+            print(image_forward_outs.shape)
+            #image_features = self.interpolate(image_forward_outs)
+            return image_forward_outs
 
     @property
     def image_size(self):
