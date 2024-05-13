@@ -52,7 +52,7 @@ def load_vision_model(vision_tower, args):
         return ClipVisionTower(vision_tower, args=args)
     if "clip-convnext" in vision_tower.lower():
         logger.info(f"Loading **ConvNeXt CLIP** Vision Tower: {vision_tower}")
-        return CLIPConvNextTower(vision_tower, args=vision_tower_cfg, **kwargs)
+        return CLIPConvNextTower(vision_tower, args=args)
     if "apple/dfn" in vision_tower.lower():
         logger.info(f"Loading **Apple DFN CLIP** Vision Tower: {vision_tower}")
         return DfnClipVisionTower(vision_tower, args=args)
