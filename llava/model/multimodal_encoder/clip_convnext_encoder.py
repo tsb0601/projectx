@@ -50,7 +50,10 @@ class CLIPConvNextTower(BaseVisionTower):
         """
         super().__init__(vision_tower, args, delay_load)
 
+        print("here!!!!")
+
         base_model_name, res, interp = extract_res_interp(vision_tower)
+
         self.vision_tower_name = base_model_name
         self._image_size = res if res is not None else 512
         self._interp_size = interp  # default 256
