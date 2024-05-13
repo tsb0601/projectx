@@ -83,8 +83,8 @@ class CLIPConvNextTower(BaseVisionTower):
         print("This is what I got:", base_model_name, res, interp)
 
         self.vision_tower_name = base_model_name
-        self._image_size = res if res is not None else 512
-        self._interp_size = interp  # default 256
+        self._image_size = res if res is not None else 1024
+        self._interp_size = interp if interp is not None else 576 # default 256
         self._reduction = 32
 
 
@@ -132,9 +132,11 @@ class CLIPConvNextTower(BaseVisionTower):
         """
         with torch.set_grad_enabled(self.unfreeze_mm_vision_tower):
             image_forward_outs = self.vision_tower.forward_features(images.to(device=self.device, dtype=self.dtype))
-            #image_features = self.interpolate(image_forward_outs)
             print(image_forward_outs.shape)
-            return image_forward_outs
+            
+            image_features = self.interpolate(image_forward_outs)
+            print(image_features.shape)
+            return image_features
 
     @property
     def image_size(self):
