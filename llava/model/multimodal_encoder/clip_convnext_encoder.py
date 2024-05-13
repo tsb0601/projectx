@@ -50,7 +50,7 @@ class CLIPConvNextTower(BaseVisionTower):
         """
         super().__init__(vision_tower, args, delay_load)
 
-        print("here!!!!")
+        
 
         base_model_name, res, interp = extract_res_interp(vision_tower)
 
@@ -77,6 +77,15 @@ class CLIPConvNextTower(BaseVisionTower):
         """
         assert "clip-convnext" in self.vision_tower_name.lower()
         self.vision_model = "convnext"
+
+        base_model_name, res, interp = extract_res_interp(self.vision_tower_name)
+
+        self.vision_tower_name = base_model_name
+        self._image_size = res if res is not None else 512
+        self._interp_size = interp  # default 256
+        self._reduction = 32
+
+
         clip_model, processor = create_model_from_pretrained(self.vision_tower_name)
         processor.transforms[0].size = self._image_size
         processor.transforms[1].size = (self._image_size, self._image_size)
