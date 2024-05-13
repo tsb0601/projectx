@@ -33,6 +33,12 @@ def extract_res_interp(model_name):
 
 
 class CLIPConvNextTower(BaseVisionTower):
+
+    def _post_init(self):
+        # extract image resolution from model name
+        if not self.delay_load:
+            self.load_model()
+
     def __init__(self, vision_tower, args, delay_load=False):
         """
         Initialize the CLIPConvNextTower.
