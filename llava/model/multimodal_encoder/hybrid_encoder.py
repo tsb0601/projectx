@@ -139,7 +139,7 @@ class HybridVisionTower(BaseVisionTower):
                 batch_tensor = torch.stack(processed_images)
                 #print("batch tensor", batch_tensor.shape)
                 image_features = vision_tower._forward(batch_tensor.to(device=self.device, dtype=self.dtype))
-                print(image_features.shape)
+                #print(image_features.shape)
                 b, num_tokens, dim = image_features.shape
                 if num_tokens != self.image_token_len:
                     target_h = target_w = int(np.sqrt(self.image_token_len))
