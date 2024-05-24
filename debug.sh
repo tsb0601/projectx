@@ -4,12 +4,12 @@ export PJRT_DEVICE=TPU
 export XLA_USE_BF16=0
 export WANDB_ENTITY=nyu-visionx
 export WANDB_PROJECT=llava
-export CKPT_NAME="TPU-llava-v1.5-7b-finetune-9784k"
+export CKPT_NAME="unfreeze-debug-clip"
 
 python llava/train/train_tpu.py \
     --model_name_or_path lmsys/vicuna-7b-v1.5 \
     --version v1 \
-    --data_path /mnt/disks/storage/data/finetune_data/9784kL.jsonl \
+    --data_path /mnt/disks/storage/data/finetune_data/jsons/737k.jsonl \
     --image_folder /mnt/disks/storage/data/finetune_data \
     --vision_tower openai/clip-vit-large-patch14-336 \
     --mm_projector_type mlp2x_gelu \
@@ -17,11 +17,14 @@ python llava/train/train_tpu.py \
     --mm_use_im_start_end False \
     --mm_use_im_patch_token False \
     --image_aspect_ratio pad \
+    --unpad True \
+    --unfreeze_mm_vision_tower \
+    --mm_vision_tower_lr 1e-5 \
     --group_by_modality_length True \
     --bf16 False \
     --output_dir ./checkpoints/$CKPT_NAME \
     --num_train_epochs 1 \
-    --per_device_train_batch_size 8 \
+    --per_device_train_batch_size 16 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
     --evaluation_strategy "no" \

@@ -1,6 +1,7 @@
 {
     "fsdp_transformer_layer_cls_to_wrap": [
-        "LlamaDecoderLayer"
+        "LlamaDecoderLayer",
+        "CLIPEncoderLayer"
     ],
     "xla": true,
     "xla_fsdp_settings": {
