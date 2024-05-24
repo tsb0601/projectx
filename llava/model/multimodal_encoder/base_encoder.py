@@ -3,19 +3,18 @@ from abc import ABC, abstractmethod
 import torch
 import torch.nn as nn
 
-from transformers import CLIPVisionModel, CLIPImageProcessor, CLIPVisionConfig
-from open_clip import create_model_from_pretrained, get_tokenizer 
+from ezcolorlog import root_logger as logger
 
 
 class ProcessorWrapper:
     def __init__(self, transform, height=378, width=378, image_mean = [0.48145466, 0.4578275, 0.40821073]):
         self._crop_size = {
             "height": height,
-            "width": width, 
+            "width": width,
         }
         self._transforms = transform
         #print(transform)
-        self.image_mean = [0.48145466, 0.4578275, 0.40821073]
+        self.image_mean = image_mean
 
     @property
     def crop_size(self):
@@ -29,26 +28,21 @@ class ProcessorWrapper:
 
 
 class BaseVisionTower(nn.Module):
-    def __init__(self, vision_tower, args, delay_load=False):
-        super().__init__()
+    def __init__(self, vision_tower_name, args, delay_load=False):
+        super(BaseVisionTower, self).__init__()
 
         self.is_loaded = False
         self.args = args
-        self.vision_tower_name = vision_tower
+
+        self.vision_tower_name = vision_tower_name
         self.select_layer = args.mm_vision_select_layer
         self.select_feature = getattr(args, 'mm_vision_select_feature', 'patch')
         self.unfreeze_mm_vision_tower = getattr(args, 'unfreeze_mm_vision_tower', False)
+        logger.warning(f"Unfreezing MM Vision Tower: {self.unfreeze_mm_vision_tower}")
         self.delay_load = delay_load
 
-        self._post_init()
-
     @abstractmethod
-    def _post_init(self):
-        """Load Model and other initializations"""
-        raise NotImplementedError("Subclasses must implement _post_init")
-
-    @abstractmethod
-    def load_model(self):
+    def load_model(self, device_map=None):
         raise NotImplementedError("Subclasses must implement load_model")
 
     @abstractmethod
@@ -120,8 +114,14 @@ class BaseVisionTower(nn.Module):
 
     @property
     def num_patches_per_side(self):
-        return self.image_size // self.patch_size
+        try:
+            return self.image_size // self.patch_size
+        except:
+            return self._num_patches_per_side
 
     @property
     def num_patches(self):
-        return self.num_patches_per_side ** 2
+        try:
+            return self.num_patches_per_side ** 2
+        except:
+            return self._num_patches

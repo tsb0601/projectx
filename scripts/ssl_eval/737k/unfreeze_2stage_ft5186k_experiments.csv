@@ -1,0 +1,11 @@
+name,vision_tower,image_token_len,ran,group
+dinov2-res336,facebook/dinov2-large-res336,576,yes,A
+SigLIP,siglip/CLIP-ViT-SO400M-14-384,729,yes,A
+clip,openai/clip-vit-large-patch14-336,576,no,clip
+large-midas-p16-res384,large-midas,576,no,C
+clip-convnext-res512-interp576,clip-convnext-res512-interp576,576,no,A
+MOCO-v3-vit-v-16,moco-vit-b-16,196,no,C
+iJEPA-vit-h-14,ijepa-vit-h-14,256,no,C
+supervised-vit-l-16-in21k,supervised-vit-l-16-in21k,196,no,B
+
+SigLIP-vit-l,timm/ViT-L-16-SigLIP-384,576,no,siglip-vit-l

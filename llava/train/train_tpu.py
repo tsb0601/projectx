@@ -29,6 +29,7 @@ import torch_xla
 
 #from llava.train.train import train
 from llava.train.train_fsdp import train
+# from llava.train.projectx_train_fsdp import train
 
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 from transformers.models.llama.tokenization_llama import LlamaTokenizer
@@ -61,8 +62,7 @@ if __name__ == "__main__":
     #train()
     import multiprocessing as mp
     import torch_xla.distributed.xla_multiprocessing as xmp
-   
-   
+
+
     mp.set_start_method('spawn', force=True)
     xmp.spawn(train, args=(None,))
-

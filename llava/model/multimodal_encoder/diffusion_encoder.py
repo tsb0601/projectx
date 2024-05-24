@@ -157,12 +157,6 @@ class OneStepSDPipeline(StableDiffusionPipeline):
 
 class DiffusionVisionTower(BaseVisionTower):
 
-    def _post_init(self):
-        if not self.delay_load:
-            self.load_model()
-        elif self.unfreeze_mm_vision_tower:
-            self.load_model()
-
     def __init__(self, vision_tower, args, delay_load=False):
         super(DiffusionVisionTower, self).__init__(vision_tower, args, delay_load)
 
@@ -231,18 +225,18 @@ class DiffusionVisionTower(BaseVisionTower):
             sd_id, subfolder="scheduler"
         )
 
-        self.vision_tower = onestep_pipe
+        self.onestep_pipe = onestep_pipe
 
         self.vae = onestep_pipe.vae
         self.unet = onestep_pipe.unet
         self.scheduler = onestep_pipe.scheduler
 
         self.up_ft_index = [0, 1, 2, 3]
-        self.vision_tower.output_tokens = True
+        self.onestep_pipe.output_tokens = True
 
         # Encode the empty prompt once and reuse it in extract_features
         with torch.no_grad():
-            self.empty_prompt_embeds = self.vision_tower.encode_prompt(
+            self.empty_prompt_embeds = self.onestep_pipe.encode_prompt(
                 [""],
                 device=self.device,
                 num_images_per_prompt=1,
@@ -256,15 +250,17 @@ class DiffusionVisionTower(BaseVisionTower):
         self._patch_size = 16
         # print(self._image_size, self._patch_size)
         preprocess = transforms.Compose([
-            transforms.Resize(512),            # Resize the image to 256x256 pixels
-            transforms.ToTensor(),             # Convert the image to a PyTorch tensor
+            transforms.Resize(512),                 # Resize the shorter side to 512 pixels
+            transforms.CenterCrop(512),             # Crop the center to make it 512x512
+            transforms.ToTensor(),                  # Convert the image to a PyTorch tensor
             transforms.Normalize(mean=[0.5, 0.5, 0.5],  # Normalize the tensor
                                  std=[0.5, 0.5, 0.5])
         ])
 
         self.image_processor = ProcessorWrapper(preprocess, height=self._image_size, width=self._image_size)
 
-        #self.vision_tower.requires_grad_(self.unfreeze_mm_vision_tower)
+        # freeze or unfreeze the unet
+        self.unet.requires_grad_(self.unfreeze_mm_vision_tower)
         self.is_loaded = True
 
     def _forward(self, images):

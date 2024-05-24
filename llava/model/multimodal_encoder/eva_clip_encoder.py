@@ -7,7 +7,14 @@ from .clip_encoder import ClipVisionTower
 
 
 class EvaClipVisionTower(ClipVisionTower):
-    def load_model(self):
+    def __init__(self, vision_tower_name, args, delay_load=False):
+        super(ClipVisionTower, self).__init__(vision_tower_name, args, delay_load)
+        if not self.delay_load:
+            self.load_model()
+        elif self.unfreeze_mm_vision_tower:
+            self.load_model()
+
+    def load_model(self, device_map=None):
         if self.vision_tower_name in (
             "eva/CLIP-ViT-L-336",
             "timm/eva02_large_patch14_clip_336.merged2b_s6b_b61k"
@@ -26,15 +33,14 @@ class EvaClipVisionTower(ClipVisionTower):
             self._patch_size = 14
         else:
             raise ValueError(f'Unknown vision tower: {self.vision_tower_name}')
-        
+
         self.vision_tower: Eva = clip_model.visual.trunk
         self.vision_tower.output_tokens = True
         self._hidden_size = 1024
-        
-        
+
         self._image_size = self.vision_tower.pretrained_cfg["input_size"][-1]
 
-        self.vision_tower.requires_grad_(False)
+        self.vision_tower.requires_grad_(self.unfreeze_mm_vision_tower)
         self.is_loaded = True
 
     def _forward(self, images):

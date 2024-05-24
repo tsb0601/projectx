@@ -18,11 +18,24 @@ def extract_res_interp(model_name):
     Returns:
         tuple: A tuple containing the base model name, image resolution, and interpolation size.
     """
-    base_model_name = "hf-hub:laion/CLIP-convnext_large_d_320.laion2B-s29B-b131K-ft-soup"
+
+    valid_model_prefixes = [
+        "clip-convnext-XXL",
+        "clip-convnext-large",
+        "clip-convnext",
+    ]
+
+    for prefix in valid_model_prefixes:
+        if model_name.startswith(prefix):
+            base_model_name = prefix
+            break
+    else:
+        raise ValueError(f"Unknown vision tower: {model_name}")
+
     res = None
     interp = None
 
-    parts = model_name.split("-")
+    parts = model_name[len(base_model_name):].split("-")
     for part in parts:
         if part.startswith("res"):
             res = int(part[3:])
@@ -33,12 +46,6 @@ def extract_res_interp(model_name):
 
 
 class CLIPConvNextTower(BaseVisionTower):
-
-    def _post_init(self):
-        # extract image resolution from model name
-        if not self.delay_load:
-            self.load_model()
-
     def __init__(self, vision_tower, args, delay_load=False):
         """
         Initialize the CLIPConvNextTower.
@@ -50,10 +57,7 @@ class CLIPConvNextTower(BaseVisionTower):
         """
         super().__init__(vision_tower, args, delay_load)
 
-        
-
         base_model_name, res, interp = extract_res_interp(vision_tower)
-
         self.vision_tower_name = base_model_name
         self._image_size = res if res is not None else 512
         self._interp_size = interp  # default 256
@@ -64,37 +68,39 @@ class CLIPConvNextTower(BaseVisionTower):
         self.unfreeze_mm_vision_tower = getattr(args, 'unfreeze_mm_vision_tower', False)
         self.is_loaded = False
 
+        if self.vision_tower_name.lower() == "clip-convnext-xxl":
+            self.hf_model_name = "hf-hub:laion/CLIP-convnext_xxlarge-laion2B-s34B-b82K-augreg-soup"
+            self._hidden_size = 3072
+        elif self.vision_tower_name.lower() in ["clip-convnext-large", "clip-convnext"]:
+            self.hf_model_name = "hf-hub:laion/CLIP-convnext_large_d_320.laion2B-s29B-b131K-ft-soup"
+            self._hidden_size = 1536
+        else:
+            raise ValueError(f'Unknown vision tower: {self.vision_tower_name}')
+
         if not delay_load:
             self.load_model()
         elif self.unfreeze_mm_vision_tower:
             self.load_model()
-        else:
-            self._hidden_size = 1536
 
     def load_model(self, device_map=None):
         """
         Load the CLIP-ConvNext model.
         """
+
         assert "clip-convnext" in self.vision_tower_name.lower()
         self.vision_model = "convnext"
 
-        base_model_name, res, interp = extract_res_interp(self.vision_tower_name)
-
-        print("This is what I got:", base_model_name, res, interp)
-
-        self.vision_tower_name = base_model_name
-        self._image_size = res if res is not None else 1024
-        self._interp_size = interp if interp is not None else 576 # default 256
-        self._reduction = 32
+        clip_model, processor = create_model_from_pretrained(self.hf_model_name)
 
 
-        clip_model, processor = create_model_from_pretrained(self.vision_tower_name)
         processor.transforms[0].size = self._image_size
         processor.transforms[1].size = (self._image_size, self._image_size)
         self.image_processor = ProcessorWrapper(processor, height=self._image_size, width=self._image_size)
         self.vision_tower: ConvNeXt = clip_model.visual.trunk
+        hidden_size = self.vision_tower.feature_info[-1]["num_chs"]
+        assert self._hidden_size == hidden_size, f"Hidden size mismatch: {self._hidden_size} != {hidden_size}"
+
         self.vision_tower.output_tokens = True
-        self._hidden_size = 1536
         self.vision_tower.requires_grad_(self.unfreeze_mm_vision_tower)
         self.is_loaded = True
 
@@ -132,10 +138,7 @@ class CLIPConvNextTower(BaseVisionTower):
         """
         with torch.set_grad_enabled(self.unfreeze_mm_vision_tower):
             image_forward_outs = self.vision_tower.forward_features(images.to(device=self.device, dtype=self.dtype))
-            print(image_forward_outs.shape)
-            
             image_features = self.interpolate(image_forward_outs)
-            print(image_features.shape)
             return image_features
 
     @property

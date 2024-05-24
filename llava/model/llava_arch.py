@@ -105,6 +105,8 @@ class LlavaMetaModel:
             if model_args.unpad:
                 self.image_newline.data = mm_projector_weights['model.image_newline']
 
+        logger.warning(f"Initalized vision tower: type={type(vision_tower)}")
+
 
 def unpad_image(tensor, original_size):
     """
@@ -167,7 +169,6 @@ class LlavaMetaForCausalLM(ABC):
         vision_tower = self.get_vision_tower()
         if vision_tower is None or images is None or input_ids.shape[1] == 1:
             return input_ids, position_ids, attention_mask, past_key_values, None, labels
-
 
         unpad = getattr(self.config, 'unpad', False)
         image_features = self.encode_images(images)

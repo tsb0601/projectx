@@ -1,0 +1,6 @@
+name,vision_tower,image_token_len,ran,group
+clip,openai/clip-vit-large-patch14,256,yes,A
+SigLIP,timm/ViT-SO400M-14-SigLIP,256,yes,A
+DFN-CLIP,apple/DFN2B-CLIP-ViT-L-14,256,no,A
+dinov2,facebook/dinov2-large-res224,256,no,B
+EVACLIP,eva/CLIP-ViT-L-224,256,no,B

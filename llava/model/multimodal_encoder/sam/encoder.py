@@ -10,6 +10,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ezcolorlog import root_logger as logger
+
 
 class MLPBlock(nn.Module):
     def __init__(
@@ -550,7 +552,8 @@ SAM_MODEL_CONFIG = {
 
 
 def create_sam_vit(
-    model_name: str = "sam_b_downsample",
+    # model_name: str = "sam_b_downsample",
+    model_name: str = "sam_vit_b",
     image_size: int = 1024,
     pretrained: bool = True,
     **kwargs,
@@ -558,6 +561,7 @@ def create_sam_vit(
     assert (
         model_name in SAM_MODEL_CONFIG.keys()
     ), f"model name: {model_name} should be in {SAM_MODEL_CONFIG.keys()}"
+    logger.info(f"Creating SAM-ViT model {model_name}")
 
     sam_cfg = SAMViTCfg(**SAM_MODEL_CONFIG[model_name])
     image_encoder = ImageEncoderViT(
@@ -594,3 +598,4 @@ if __name__ == "__main__":
     net = create_sam_vit().bfloat16()
     out = net(x)
     print(x.shape, out.shape)
+    print(out)

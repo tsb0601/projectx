@@ -1,0 +1,6 @@
+name,vision_tower,image_token_len,ran
+SigLIP,siglip/CLIP-ViT-SO400M-14-384,729,yes
+dinov2,facebook/dinov2-large,1369,yes
+clip,openai/clip-vit-large-patch14-336,576,yes
+EVACLIP,eva/CLIP-ViT-L-336,576,no
+DFN-CLIP,apple/DFN5B-CLIP-ViT-H-14-378,729,no

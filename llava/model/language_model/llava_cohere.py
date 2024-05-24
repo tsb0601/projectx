@@ -26,6 +26,7 @@ from transformers import AutoConfig, AutoModelForCausalLM, \
 from transformers.modeling_outputs import CausalLMOutputWithPast
 from transformers.generation.utils import GenerateOutput
 
+from llava.utils import IS_XLA_AVAILABLE
 from ..llava_arch import LlavaMetaModel, LlavaMetaForCausalLM
 
 
@@ -92,8 +93,12 @@ class LlavaCohereForCausalLM(CohereForCausalLM, LlavaMetaForCausalLM):
                 image_sizes
             )
              
-        from torch_xla.utils.checkpoint import checkpoint
-        self.model._gradient_checkpointing_func = checkpoint
+        if IS_XLA_AVAILABLE:
+            # Very Important for TorchXLA
+            #self.model.gradient_checkpointing = False
+        
+            from torch_xla.utils.checkpoint import checkpoint
+            self.model._gradient_checkpointing_func = checkpoint
         
         return super().forward(
             input_ids=input_ids,

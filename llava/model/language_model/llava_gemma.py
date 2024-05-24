@@ -17,7 +17,7 @@ from typing import List, Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
-import torch_xla
+
 from transformers import AutoConfig, AutoModelForCausalLM, \
                          GemmaConfig, GemmaModel, GemmaForCausalLM
 
@@ -25,6 +25,7 @@ from transformers.modeling_outputs import CausalLMOutputWithPast
 from transformers.generation.utils import GenerateOutput
 
 from ..llava_arch import LlavaMetaModel, LlavaMetaForCausalLM
+from llava.utils import IS_XLA_AVAILABLE
 
 
 class LlavaConfig(GemmaConfig):
@@ -100,11 +101,12 @@ class LlavaGemmaForCausalLM(GemmaForCausalLM, LlavaMetaForCausalLM):
                 image_sizes
             )
 
-        # Very Important for TorchXLA
-        #self.model.gradient_checkpointing = False
-            
-        from torch_xla.utils.checkpoint import checkpoint
-        self.model._gradient_checkpointing_func = checkpoint
+        if IS_XLA_AVAILABLE:
+            # Very Important for TorchXLA
+            #self.model.gradient_checkpointing = False
+                
+            from torch_xla.utils.checkpoint import checkpoint
+            self.model._gradient_checkpointing_func = checkpoint
 
         output = super().forward(
             input_ids=input_ids,

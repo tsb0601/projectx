@@ -163,7 +163,7 @@ def expand2square(pil_img, background_color):
         return result
 
 
-def process_images(images, image_processor, model_cfg):
+def _process_images(images, image_processor, model_cfg):
     image_aspect_ratio = getattr(model_cfg, "image_aspect_ratio", None)
     new_images = []
     if image_aspect_ratio == 'pad':
@@ -180,6 +180,21 @@ def process_images(images, image_processor, model_cfg):
     if all(x.shape == new_images[0].shape for x in new_images):
         new_images = torch.stack(new_images, dim=0)
     return new_images
+
+
+def process_images(image, image_processor, model_cfg):
+    if type(image_processor) is list:
+        images = []
+        for processor in image_processor:
+            image_tensor = _process_images(image, processor, model_cfg)[0]
+            image_tensor = image_tensor.unsqueeze(0).half().cuda()
+            images.append(image_tensor)
+        return [images]
+    else:
+        image_tensor = _process_images(image, image_processor, model_cfg)[0]
+        images = image_tensor.unsqueeze(0).half().cuda()
+
+    return images
 
 
 def tokenizer_image_token(prompt, tokenizer, image_token_index=IMAGE_TOKEN_INDEX, return_tensors=None):
@@ -203,22 +218,6 @@ def tokenizer_image_token(prompt, tokenizer, image_token_index=IMAGE_TOKEN_INDEX
         raise ValueError(f'Unsupported tensor type: {return_tensors}')
     return input_ids
 
-def tokenizer_image_token_llama3(prompt, tokenizer, image_token_index=IMAGE_TOKEN_INDEX, return_tensors=None):
-    prompt_chunks = [tokenizer(chunk).input_ids for chunk in prompt.split('<image>')]
-    
-    def insert_separator(X, sep):
-        return [ele for sublist in zip(X, [sep]*len(X)) for ele in sublist][:-1]
-    
-    input_ids = []
-    for x in insert_separator(prompt_chunks, [image_token_index]):
-        input_ids.extend(x)
-    
-    if return_tensors is not None:
-        if return_tensors == 'pt':
-            return torch.tensor(input_ids, dtype=torch.long)
-        raise ValueError(f'Unsupported tensor type: {return_tensors}')
-    return input_ids
-
 
 def get_model_name_from_path(model_path):
     model_path = model_path.strip("/")
@@ -227,6 +226,7 @@ def get_model_name_from_path(model_path):
         return model_paths[-2] + "_" + model_paths[-1]
     else:
         return model_paths[-1]
+
 
 class KeywordsStoppingCriteria(StoppingCriteria):
     def __init__(self, keywords, tokenizer, input_ids):
@@ -247,7 +247,8 @@ class KeywordsStoppingCriteria(StoppingCriteria):
         offset = min(output_ids.shape[1] - self.start_len, self.max_keyword_len)
         self.keyword_ids = [keyword_id.to(output_ids.device) for keyword_id in self.keyword_ids]
         for keyword_id in self.keyword_ids:
-            if (output_ids[0, -keyword_id.shape[0]:] == keyword_id).all():
+            truncated_output_ids = output_ids[0, -keyword_id.shape[0]:]
+            if torch.equal(truncated_output_ids, keyword_id):
                 return True
         outputs = self.tokenizer.batch_decode(output_ids[:, -offset:], skip_special_tokens=True)[0]
         for keyword in self.keywords:

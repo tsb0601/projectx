@@ -1,6 +1,9 @@
 import dataclasses
 from enum import auto, Enum
 from typing import List, Tuple
+import base64
+from io import BytesIO
+from PIL import Image
 
 
 class SeparatorStyle(Enum):
@@ -10,7 +13,6 @@ class SeparatorStyle(Enum):
     MPT = auto()
     PLAIN = auto()
     LLAMA_2 = auto()
-    LLAMA_3 = auto()
     MISTRAL = auto()
     GEMMA = auto()
 
@@ -41,8 +43,6 @@ class Conversation:
                 messages.insert(1, (self.roles[1], "Received."))
             else:
                 messages[0] = (init_role, "<image>\n" + init_msg)
-        
-        #print("message is", messages)
 
         if self.sep_style == SeparatorStyle.SINGLE:
             ret = self.system + self.sep
@@ -93,29 +93,6 @@ class Conversation:
                 else:
                     ret += ""
             ret = ret.lstrip(self.sep)
-        elif self.sep_style == SeparatorStyle.LLAMA_3:
-            wrap_sys = lambda msg: f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>{msg}<|eot_id|>" if len(msg) > 0 else msg
-            wrap_inst_user = lambda msg: f"<|start_header_id|>user<|end_header_id|>{msg}<|eot_id|>"
-            wrap_inst_assistant = lambda msg: f"<|start_header_id|>assistant<|end_header_id|>{msg}<|eot_id|>"
-            ret = ""
-
-            for i, (role, message) in enumerate(messages):
-                if i == 0:
-                    assert message, "first message should not be none"
-                    assert role == self.roles[0], "first message should come from user"
-                if message:
-                    if type(message) is tuple:
-                        message, _, _ = message
-                    if i == 0: ret += wrap_sys(self.system)
-
-                    if i % 2 == 0:
-                        message = wrap_inst_user(message)
-                        ret += message
-                    else:
-                        message = wrap_inst_assistant(message)
-                        ret += message
-                else:
-                    ret += ""
         elif self.sep_style == SeparatorStyle.MISTRAL:
             wrap_sys = lambda msg: f"<<SYS>>\n{msg}\n<</SYS>>\n\n" if len(msg) > 0 else msg
             wrap_inst = lambda msg: f"[INST] {msg} [/INST]"
@@ -164,54 +141,54 @@ class Conversation:
     def append_message(self, role, message):
         self.messages.append([role, message])
 
+    def process_image(self, image, image_process_mode, return_pil=False, image_format='PNG', max_len=1344, min_len=672):
+        if image_process_mode == "Pad":
+            def expand2square(pil_img, background_color=(122, 116, 104)):
+                width, height = pil_img.size
+                if width == height:
+                    return pil_img
+                elif width > height:
+                    result = Image.new(pil_img.mode, (width, width), background_color)
+                    result.paste(pil_img, (0, (width - height) // 2))
+                    return result
+                else:
+                    result = Image.new(pil_img.mode, (height, height), background_color)
+                    result.paste(pil_img, ((height - width) // 2, 0))
+                    return result
+            image = expand2square(image)
+        elif image_process_mode in ["Default", "Crop"]:
+            pass
+        elif image_process_mode == "Resize":
+            image = image.resize((336, 336))
+        else:
+            raise ValueError(f"Invalid image_process_mode: {image_process_mode}")
+        if max(image.size) > max_len:
+            max_hw, min_hw = max(image.size), min(image.size)
+            aspect_ratio = max_hw / min_hw
+            shortest_edge = int(min(max_len / aspect_ratio, min_len, min_hw))
+            longest_edge = int(shortest_edge * aspect_ratio)
+            W, H = image.size
+            if H > W:
+                H, W = longest_edge, shortest_edge
+            else:
+                H, W = shortest_edge, longest_edge
+            image = image.resize((W, H))
+        if return_pil:
+            return image
+        else:
+            buffered = BytesIO()
+            image.save(buffered, format=image_format)
+            img_b64_str = base64.b64encode(buffered.getvalue()).decode()
+            return img_b64_str
+
     def get_images(self, return_pil=False):
         images = []
         for i, (role, msg) in enumerate(self.messages[self.offset:]):
             if i % 2 == 0:
                 if type(msg) is tuple:
-                    import base64
-                    from io import BytesIO
-                    from PIL import Image
                     msg, image, image_process_mode = msg
-                    if image_process_mode == "Pad":
-                        def expand2square(pil_img, background_color=(122, 116, 104)):
-                            width, height = pil_img.size
-                            if width == height:
-                                return pil_img
-                            elif width > height:
-                                result = Image.new(pil_img.mode, (width, width), background_color)
-                                result.paste(pil_img, (0, (width - height) // 2))
-                                return result
-                            else:
-                                result = Image.new(pil_img.mode, (height, height), background_color)
-                                result.paste(pil_img, ((height - width) // 2, 0))
-                                return result
-                        image = expand2square(image)
-                    elif image_process_mode in ["Default", "Crop"]:
-                        pass
-                    elif image_process_mode == "Resize":
-                        image = image.resize((336, 336))
-                    else:
-                        raise ValueError(f"Invalid image_process_mode: {image_process_mode}")
-                    max_hw, min_hw = max(image.size), min(image.size)
-                    aspect_ratio = max_hw / min_hw
-                    max_len, min_len = 800, 400
-                    shortest_edge = int(min(max_len / aspect_ratio, min_len, min_hw))
-                    longest_edge = int(shortest_edge * aspect_ratio)
-                    W, H = image.size
-                    if longest_edge != max(image.size):
-                        if H > W:
-                            H, W = longest_edge, shortest_edge
-                        else:
-                            H, W = shortest_edge, longest_edge
-                        image = image.resize((W, H))
-                    if return_pil:
-                        images.append(image)
-                    else:
-                        buffered = BytesIO()
-                        image.save(buffered, format="PNG")
-                        img_b64_str = base64.b64encode(buffered.getvalue()).decode()
-                        images.append(img_b64_str)
+                    image = self.process_image(image, image_process_mode, return_pil=return_pil)
+                    images.append(image)
         return images
 
     def to_gradio_chatbot(self):
@@ -219,24 +196,11 @@ class Conversation:
         for i, (role, msg) in enumerate(self.messages[self.offset:]):
             if i % 2 == 0:
                 if type(msg) is tuple:
-                    import base64
-                    from io import BytesIO
                     msg, image, image_process_mode = msg
-                    max_hw, min_hw = max(image.size), min(image.size)
-                    aspect_ratio = max_hw / min_hw
-                    max_len, min_len = 800, 400
-                    shortest_edge = int(min(max_len / aspect_ratio, min_len, min_hw))
-                    longest_edge = int(shortest_edge * aspect_ratio)
-                    W, H = image.size
-                    if H > W:
-                        H, W = longest_edge, shortest_edge
-                    else:
-                        H, W = shortest_edge, longest_edge
-                    image = image.resize((W, H))
-                    buffered = BytesIO()
-                    image.save(buffered, format="JPEG")
-                    img_b64_str = base64.b64encode(buffered.getvalue()).decode()
-                    img_str = f'<img src="data:image/png;base64,{img_b64_str}" alt="user upload image" />'
+                    img_b64_str = self.process_image(
+                        image, "Default", return_pil=False,
+                        image_format='JPEG')
+                    img_str = f'<img src="data:image/jpeg;base64,{img_b64_str}" alt="user upload image" />'
                     msg = img_str + msg.replace('<image>', '').strip()
                     ret.append([msg, None])
                 else:
@@ -481,20 +445,7 @@ Answer the questions.""",
     sep="<|im_end|>",
 )
 
-
-conv_llama_3 = Conversation(
-    system="""You are Cambrian, a highly intelligent multimodal AI trained by NYU Vision X. 
-    As a multimodal AI, you have the ability to process and analyze images. Whenever an image is present in the conversation, very carefully examine it and consider its content when formulating your response.
-    You should give concise responses to very simple questions, but provide thorough responses to more complex and open-ended questions. """,
-    roles=("USER", "ASSISTANT"),
-    version="llama_v3",
-    messages=(),
-    offset=0,
-    sep_style=SeparatorStyle.LLAMA_3,
-    sep="<|begin_of_text|>",
-    sep2="<|end_of_text|>",
-)
-conv_chatml_direct = Conversation(
+conv_cambrian_chatml = Conversation(
     system="""<|im_start|>system\nYou are Cambrian, a highly intelligent multimodal AI trained by NYU Vision X. As a multimodal AI, you have the ability to process and analyze images. Whenever an image is present in the conversation, very carefully examine it and consider its content when formulating your response. You should give concise responses to very simple questions, but provide thorough responses to more complex and open-ended questions.""",
     roles=("<|im_start|>user\n", "<|im_start|>assistant\n"),
     version="mpt",
@@ -504,10 +455,7 @@ conv_chatml_direct = Conversation(
     sep="<|im_end|>",
 )
 
-#default_conversation = conv_chatml_direct
 default_conversation = conv_vicuna_v1
-
-#default_conversation = conv_llama_3
 
 conv_templates = {
     "default": conv_vicuna_v0,
@@ -517,9 +465,9 @@ conv_templates = {
     "vicuna_cambrian": conv_vicuna_cambrian,
     "cohere_v1": conv_llava_cohere,
     "llama_2": conv_llama_2,
-    "llama_3": conv_llama_3,
     "mistral_instruct": conv_mistral_instruct,
     "chatml_direct": conv_chatml_direct,
+    "cambrian_chatml": conv_cambrian_chatml,
     "mistral_direct": conv_chatml_direct,
     "mistral_v2": conv_mistral_v2,
 
@@ -536,4 +484,22 @@ conv_templates = {
 
 
 if __name__ == "__main__":
+
     print(default_conversation.get_prompt())
+
+    messages = [
+        {"role": "user", "content": "What is your favourite condiment?"},
+        {"role": "assistant", "content": "Well, I'm quite partial to a good squeeze of fresh lemon juice. It adds just the right amount of zesty flavour to whatever I'm cooking up in the kitchen!"},
+        {"role": "user", "content": "Do you have mayonnaise recipes?"},
+        {"role": "assistant", "content": "I sure do! Here's a simple recipe for homemade mayonnaise: Ingredients: 1 egg yolk, 1 teaspoon Dijon mustard, 1 cup vegetable oil, 1 tablespoon lemon juice, salt and pepper to taste. Instructions: 1. In a medium bowl, whisk together the egg yolk and Dijon mustard. 2. Slowly drizzle in the vegetable oil while whisking continuously until the mixture thickens. 3. Stir in the lemon juice, salt, and pepper. 4. Store in an airtight container in the refrigerator for up to one week. Enjoy!"},
+        {"role": "user", "content": "Thank you! I'll try it out."},
+        {"role": "assistant", "content": "You're welcome! Let me know if you have any other questions."},
+        {"role": "user", "content": "I will. Goodbye!"},
+        {"role": "assistant", "content": "Goodbye! Have a great day!"}
+    ]
+
+    conv = default_conversation.copy()
+    for msg in messages:
+        conv.append_message(msg["role"], msg["content"])
+    print("\nConversation:")
+    print(conv.get_prompt())

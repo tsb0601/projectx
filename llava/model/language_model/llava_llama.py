@@ -17,7 +17,7 @@ from typing import List, Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
-import torch_xla
+
 from transformers import AutoConfig, AutoModelForCausalLM, \
                          LlamaConfig, LlamaModel, LlamaForCausalLM
 
@@ -25,6 +25,7 @@ from transformers.modeling_outputs import CausalLMOutputWithPast
 from transformers.generation.utils import GenerateOutput
 
 from ..llava_arch import LlavaMetaModel, LlavaMetaForCausalLM
+from llava.utils import IS_XLA_AVAILABLE
 
 
 class LlavaConfig(LlamaConfig):
@@ -45,12 +46,12 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
 
     def __init__(self, config):
         super(LlamaForCausalLM, self).__init__(config)
-        
+
         self.model = LlavaLlamaModel(config)
         self.pretraining_tp = config.pretraining_tp
         self.vocab_size = config.vocab_size
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
-        
+
         # Initialize weights and apply final processing
         self.post_init()
 
@@ -91,11 +92,12 @@ class LlavaLlamaForCausalLM(LlamaForCausalLM, LlavaMetaForCausalLM):
                 image_sizes
             )
 
-        # Very Important for TorchXLA
-        #self.model.gradient_checkpointing = False
-            
-        from torch_xla.utils.checkpoint import checkpoint
-        self.model._gradient_checkpointing_func = checkpoint
+        if IS_XLA_AVAILABLE:
+            # Very Important for TorchXLA
+            #self.model.gradient_checkpointing = False
+        
+            from torch_xla.utils.checkpoint import checkpoint
+            self.model._gradient_checkpointing_func = checkpoint
 
         output = super().forward(
             input_ids=input_ids,

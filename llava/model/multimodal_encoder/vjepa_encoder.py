@@ -1,7 +1,6 @@
 import torch
 from torch import nn
 import numpy as np
-from torch_xla.utils.checkpoint import checkpoint
 from huggingface_hub import hf_hub_download
 import torch.nn.functional as F
 from .base_encoder import ProcessorWrapper
@@ -26,7 +25,7 @@ class VJepaVisionTower(BaseVisionTower):
             self.load_model()
 
 
-    def load_model(self):
+    def load_model(self, device_map=None):
         self.vision_model = "ijepa"
 
         print("lower is", self.vision_tower_name.lower())
@@ -66,7 +65,7 @@ class VJepaVisionTower(BaseVisionTower):
 
         self.image_processor = ProcessorWrapper(preprocess, height=self._image_size, width=self._image_size)
 
-        self.vision_tower.requires_grad_(False)
+        self.vision_tower.requires_grad_(self.unfreeze_mm_vision_tower)
         self.is_loaded = True
 
     def _forward(self, images):

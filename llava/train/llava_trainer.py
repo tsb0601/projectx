@@ -4,16 +4,29 @@ import torch.nn as nn
 
 from torch.utils.data import Sampler
 
-from tqdm import tqdm
 from transformers import Trainer
 from transformers.trainer import (
     is_sagemaker_mp_enabled,
-    get_parameter_names,
     has_length,
-    ALL_LAYERNORM_LAYERS,
-    logger,
+    is_torch_tpu_available,
 )
+from ezcolorlog import root_logger as logger
+from llava.utils import IS_XLA_AVAILABLE
+
+from packaging import version
+if is_sagemaker_mp_enabled():
+    import smdistributed.modelparallel.torch as smp
+    from smdistributed.modelparallel import __version__ as SMP_VERSION
+
+    IS_SAGEMAKER_MP_POST_1_10 = version.parse(SMP_VERSION) >= version.parse("1.10")
+
+    from transformers.trainer_pt_utils import smp_forward_backward, smp_forward_only, smp_gather, smp_nested_concat
 from typing import List, Optional
+
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
+from transformers.utils import is_apex_available
+if is_apex_available():
+    from apex import amp
 
 
 def maybe_zero_3(param, ignore_status=False, name=None):
@@ -131,6 +144,49 @@ class LengthGroupedSampler(Sampler):
         return iter(indices)
 
 
+def _fetch_gradients(optimizer, param_to_name, selected_module_names):
+    gradients = []
+    for param_group in optimizer.param_groups:
+        for group, params in param_group.items():
+            if group == 'params':
+                for p in params:
+                    # Use the mapping to get the module name
+                    module_name = param_to_name.get(p, "")
+                    # Check if the module name matches your criteria
+                    if isinstance(p, torch.Tensor) and p.grad is not None and any(selected_name in module_name for selected_name in selected_module_names):
+                        p.grad = p.grad.to(torch.float32)
+                        gradients.append(p.grad.data)
+    return gradients
+
+
+REDUCE_SUM = 'sum'
+def reduce_gradients(optimizer, param_to_name, selected_module_names, groups=None, pin_layout=True):
+    if not IS_XLA_AVAILABLE:
+        raise NotImplementedError("Not implemented for non-XLA devices.")
+
+    from torch_xla.core.xla_model import xrt_world_size, all_reduce
+    count = xrt_world_size()
+    if count > 1:
+        gradients = _fetch_gradients(optimizer, param_to_name, selected_module_names)
+        all_reduce(
+            REDUCE_SUM,
+            gradients,
+            scale=1.0 / count,
+            groups=groups,
+            pin_layout=pin_layout)
+
+
+def map_params_to_module_names(model_list):
+    param_to_name = {}
+
+    for model in model_list:
+        for module_name, module in model.named_modules():
+            for param_name, param in module.named_parameters(recurse=False):
+                param_to_name[param] = f"{module_name}.{param_name}"
+
+    return param_to_name
+
+
 class LLaVATrainer(Trainer):
 
     def _get_train_sampler(self) -> Optional[torch.utils.data.Sampler]:
@@ -148,6 +204,32 @@ class LLaVATrainer(Trainer):
         else:
             return super()._get_train_sampler()
 
+    def training_step(self, model: nn.Module, inputs: Dict[str, Union[torch.Tensor, Any]]) -> torch.Tensor:
+        model.train()
+        inputs = self._prepare_inputs(inputs)
+        if is_sagemaker_mp_enabled():
+            loss_mb = smp_forward_backward(model, inputs, self.args.gradient_accumulation_steps)
+            return loss_mb.reduce_mean().detach().to(self.args.device)
+
+        with self.compute_loss_context_manager():
+            loss = self.compute_loss(model, inputs)
+
+        if self.args.n_gpu > 1:
+            loss = loss.mean()  # mean() to average on multi-gpu parallel training
+
+        if self.use_apex:
+            with amp.scale_loss(loss, self.optimizer) as scaled_loss:
+                scaled_loss.backward()
+        else:
+            self.accelerator.backward(loss)
+
+        # Added code for unfreezing vision tower
+        selected_module_names = ['vision_tower']
+        if self.args.unfreeze_mm_vision_tower:
+            reduce_gradients(self.optimizer, self.param_to_name, selected_module_names)
+
+        return loss.detach() / self.args.gradient_accumulation_steps
+
     def create_optimizer(self):
         """
         Setup the optimizer.
@@ -160,9 +242,19 @@ class LLaVATrainer(Trainer):
 
         opt_model = self.model
 
+        if self.args.unfreeze_mm_vision_tower:
+            opt_model.get_model().vision_tower = opt_model.get_vision_tower()
+            self.param_to_name = map_params_to_module_names([opt_model, opt_model.get_vision_tower()])
+
+        # for name, param in opt_model.named_parameters():
+        #     print(f"Module: {name}")
+        #     #print(f"Parameter: {param}")
+        #     print("---")
+
         if self.optimizer is None:
-            decay_parameters = get_parameter_names(opt_model, ALL_LAYERNORM_LAYERS)
-            decay_parameters = [name for name in decay_parameters if "bias" not in name]
+            decay_parameters = self.get_decay_parameter_names(opt_model)
+
+            # MM Projector
             if self.args.mm_projector_lr is not None:
                 projector_parameters = [name for name, _ in opt_model.named_parameters() if "mm_projector" in name]
                 optimizer_grouped_parameters = [
@@ -193,6 +285,40 @@ class LLaVATrainer(Trainer):
                         "lr": self.args.mm_projector_lr,
                     },
                 ]
+
+            # Vision Tower
+            elif self.args.unfreeze_mm_vision_tower:
+                if self.args.mm_vision_tower_lr is not None:
+                    vision_tower_parameters = [name for name, _ in opt_model.named_parameters() if "vision_tower" in name]
+                    optimizer_grouped_parameters = [
+                        {
+                            "params": [
+                                p for n, p in opt_model.named_parameters() if (n in decay_parameters and n not in vision_tower_parameters and p.requires_grad)
+                            ],
+                            "weight_decay": self.args.weight_decay,
+                        },
+                        {
+                            "params": [
+                                p for n, p in opt_model.named_parameters() if (n not in decay_parameters and n not in vision_tower_parameters and p.requires_grad)
+                            ],
+                            "weight_decay": 0.0,
+                        },
+                        {
+                            "params": [
+                                p for n, p in opt_model.named_parameters() if (n in decay_parameters and n in vision_tower_parameters and p.requires_grad)
+                            ],
+                            "weight_decay": self.args.weight_decay,
+                            "lr": self.args.mm_vision_tower_lr,
+                        },
+                        {
+                            "params": [
+                                p for n, p in opt_model.named_parameters() if (n not in decay_parameters and n in vision_tower_parameters and p.requires_grad)
+                            ],
+                            "weight_decay": 0.0,
+                            "lr": self.args.mm_vision_tower_lr,
+                        },
+                    ]
+
             else:
                 optimizer_grouped_parameters = [
                     {
@@ -208,6 +334,61 @@ class LLaVATrainer(Trainer):
                         "weight_decay": 0.0,
                     },
                 ]
+
+            # if self.args.unfreeze_mm_vision_tower:
+            #     vision_decay_parameters = self.get_decay_parameter_names(opt_model.get_vision_tower())
+            #     if self.args.mm_vision_tower_lr is not None:
+            #         vision_grouped_parameters = [
+            #             {
+            #                 "params": [
+            #                     p for n, p in opt_model.get_vision_tower().named_parameters() if (n in vision_decay_parameters and p.requires_grad)
+            #                 ],
+            #                 "weight_decay": self.args.weight_decay,
+            #                 "lr": self.args.mm_vision_tower_lr,
+            #             },
+            #             {
+            #                 "params": [
+            #                     p for n, p in opt_model.get_vision_tower().named_parameters() if (n not in vision_decay_parameters and p.requires_grad)
+            #                 ],
+            #                 "weight_decay": 0.0,
+            #                 "lr": self.args.mm_vision_tower_lr,
+            #             }
+            #         ]
+            #         optimizer_grouped_parameters += vision_grouped_parameters
+            #     else:
+            #         optimizer_grouped_parameters += [
+            #             {
+            #                 "params": [
+            #                     p for n, p in opt_model.get_vision_tower().named_parameters() if (n in decay_parameters and p.requires_grad)
+            #                 ],
+            #                 "weight_decay": self.args.weight_decay,
+            #             },
+            #             {
+            #                 "params": [
+            #                     p for n, p in opt_model.get_vision_tower().named_parameters() if (n not in decay_parameters and p.requires_grad)
+            #                 ],
+            #                 "weight_decay": 0.0,
+            #             }
+            #         ]
+
+            # # print the parameters to check if the optimizer is set up correctly
+            # # if rank 0
+            # if self.args.local_rank in [-1, 0]:
+            #     print(f"Decay parameters: {decay_parameters}")
+            #     print()
+            #     print(f"Optimizer parameters: {optimizer_grouped_parameters}")
+
+            # # TODO: print vision_decay_parameters?
+
+            #     # write to a file
+            #     basename = os.path.basename(self.args.output_dir)
+            #     fn = f"{basename}_optimizer_params.txt"
+            #     with open(fn, "w") as f:
+            #         f.write(f"Decay parameters: {decay_parameters}\n")
+            #         f.write("\n")
+            #         f.write(f"Optimizer parameters: {optimizer_grouped_parameters}\n")
+            #     print(f"Optimizer parameters written to {fn}")
+            # exit(0)
 
             optimizer_cls, optimizer_kwargs = Trainer.get_optimizer_cls_and_kwargs(self.args)
 
@@ -225,6 +406,9 @@ class LLaVATrainer(Trainer):
                         manager.register_module_override(module, "weight", {"optim_bits": 32})
                         logger.debug(f"bitsandbytes: will optimize {module} in fp32")
                 logger.info(f"skipped: {skipped/2**20}M params")
+
+        if self.args.unfreeze_mm_vision_tower:
+            opt_model.get_model().vision_tower = opt_model.get_vision_tower()
 
         return self.optimizer
 
@@ -252,6 +436,12 @@ class LLaVATrainer(Trainer):
     def _save(self, output_dir: Optional[str] = None, state_dict=None):
         if getattr(self.args, 'tune_mm_mlp_adapter', False):
             pass
+
+        if not IS_XLA_AVAILABLE:
+            raise NotImplementedError("Saving is not supported with XLA if PyTorch XLA is not installed.")
+            super(LLaVATrainer, self)._save(output_dir, state_dict)
+            return
+
         import torch_xla.core.xla_model as xm
         ckpt_prefix = os.path.join(output_dir, "model_ckpt")
         output_dir = output_dir if output_dir is not None else self.args.output_dir
@@ -260,11 +450,17 @@ class LLaVATrainer(Trainer):
         print(rank)
         world_size = xm.xrt_world_size()
         ckpt_path = f'{ckpt_prefix}_rank-{rank:08d}-of-{world_size:08d}.pth'
+        if self.args.unfreeze_mm_vision_tower:
+            self.model.get_model().vision_tower = self.model.get_vision_tower()
         state_dict = self.model.state_dict()
         cpu_state_dict = {
                 key: value.cpu()
                 for key, value in state_dict.items()
-        }
+            }
+        if not xm.is_master_ordinal(local=False):
+            cpu_state_dict = {
+                key:value for key, value in cpu_state_dict.items() if 'vision_tower' not in key
+            }
         del state_dict
         ckpt = {
             'model': cpu_state_dict,
@@ -277,9 +473,54 @@ class LLaVATrainer(Trainer):
             # consolidate_sharded_model_checkpoints(
             #     ckpt_prefix=ckpt_prefix, ckpt_suffix="_rank-*-of-*.pth", save_path = os.path.join(output_dir, "model_consolidated.pth"))
             # self.model.save_pretrained(output_dir, state_dict=None, safe_serialization=self.args.save_safetensors)
-            self.model.config.save_pretrained(output_dir)
             if self.tokenizer is not None:
                 self.tokenizer.save_pretrained(output_dir)
             TRAINING_ARGS_NAME = "training_args.bin"
             # Good practice: save your training arguments together with the trained model
             torch.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
+            self.model.config.save_pretrained(output_dir)
+
+    """Override to add custom logs"""
+
+    def _maybe_log_save_evaluate(self, tr_loss, model, trial, epoch, ignore_keys_for_eval):
+        if self.control.should_log and self.state.global_step > self._globalstep_last_logged:
+            if is_torch_tpu_available():
+                import torch_xla.core.xla_model as xm
+                xm.mark_step()
+
+            logs: Dict[str, float] = {}
+
+            # all_gather + mean() to get average loss over all processes
+            tr_loss_scalar = self._nested_gather(tr_loss).mean().item()
+
+            # reset tr_loss to zero
+            tr_loss -= tr_loss
+
+            logs["loss"] = round(tr_loss_scalar / (self.state.global_step - self._globalstep_last_logged), 4)
+            logs["learning_rate"] = self._get_learning_rate()
+
+            # Add custom logs
+            if self.args.unfreeze_mm_vision_tower:
+                logs["mm_vision_tower_lr"] = self.optimizer.param_groups[2]['lr']
+
+            self._total_loss_scalar += tr_loss_scalar
+            self._globalstep_last_logged = self.state.global_step
+            self.store_flos()
+
+            self.log(logs)
+
+        metrics = None
+        if self.control.should_evaluate:
+            metrics = self.evaluate(ignore_keys=ignore_keys_for_eval)
+            self._report_to_hp_search(trial, self.state.global_step, metrics)
+
+            # Run delayed LR scheduler now that metrics are populated
+            if isinstance(self.lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+                metric_to_check = self.args.metric_for_best_model
+                if not metric_to_check.startswith("eval_"):
+                    metric_to_check = f"eval_{metric_to_check}"
+                self.lr_scheduler.step(metrics[metric_to_check])
+
+        if self.control.should_save:
+            self._save_checkpoint(model, trial, metrics=metrics)
+            self.control = self.callback_handler.on_save(self.args, self.state, self.control)

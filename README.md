@@ -32,3 +32,10 @@ export PJRT_DEVICE=TPU &&
 export XLA_USE_BF16=0 &&
 sh finetune_fsdp.sh"
 ```
+
+### Results
+![image](https://github.com/visionx-cambrian/llava_base/assets/62696862/089ceefd-3c45-4ca0-b00a-db0731b853a7)
+
+
+
+

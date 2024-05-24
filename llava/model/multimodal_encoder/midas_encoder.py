@@ -35,11 +35,6 @@ class ProcessorWrapper:
 
 
 class MiDaSVisionTower(BaseVisionTower):
-    def _post_init(self):
-        if not self.delay_load:
-            self.load_model()
-        elif self.unfreeze_mm_vision_tower:
-            self.load_model()
 
     def __init__(self, vision_tower, args, delay_load=False):
         super(MiDaSVisionTower, self).__init__(vision_tower, args, delay_load)
@@ -72,32 +67,10 @@ class MiDaSVisionTower(BaseVisionTower):
             self.load_model()
 
     def load_model(self, device_map=None):
-         # extract midas model info here
-        self.vision_model = "midas"
-        self._model_name = ""
-
-        if self.vision_tower_name.lower() == "hybrid-midas":
-            # TODO: why does this immediately NaN???
-            self._model_name = "Intel/dpt-hybrid-midas"
-            self._hidden_size = 768
-            self._image_size = 384
-            self._patch_size = 16
-        elif self.vision_tower_name.lower() == "large-midas":
-            self._model_name = "Intel/dpt-large"
-            self._hidden_size = 1024
-            self._image_size = 384
-            self._patch_size = 16
-        elif self.vision_tower_name.lower() == "large-beit-midas-512":
-            self._model_name = "Intel/dpt-beit-large-512"
-            self._hidden_size = 1024
-            self._image_size = 512
-            self._patch_size = 16
-        else:
-            raise ValueError(f'Unknown vision tower: {self.vision_tower_name}')
-
-
         transforms = DPTImageProcessor.from_pretrained(self._model_name)
         self.vision_tower = DPTForDepthEstimation.from_pretrained(self._model_name)
+        """ValueError: DPTForDepthEstimation does not support `device_map='auto'`. To implement support, the model class needs to implement the `_no_split_modules` attribute."""
+        self.vision_tower._no_split_modules = ["DPTViTLayer"]
 
         # print(self.vision_tower)
         self.vision_tower.output_tokens = True

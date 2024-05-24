@@ -6,7 +6,7 @@ from .clip_encoder import ClipVisionTower
 
 
 class DfnClipVisionTower(ClipVisionTower):
-    def load_model(self):
+    def load_model(self, device_map=None):
         if self.vision_tower_name == "apple/DFN5B-CLIP-ViT-H-14-378":
             clip_model, processor = create_model_from_pretrained('hf-hub:apple/DFN5B-CLIP-ViT-H-14-384')
             # self._hidden_size = 1280
@@ -27,7 +27,7 @@ class DfnClipVisionTower(ClipVisionTower):
         self._patch_size = clip_model.visual.patch_size[0]
         self.image_processor = ProcessorWrapper(processor, height=self._image_size, width=self._image_size)
 
-        self.vision_tower.requires_grad_(False)
+        self.vision_tower.requires_grad_(self.unfreeze_mm_vision_tower)
         self.is_loaded = True
 
     def _forward(self, images):
