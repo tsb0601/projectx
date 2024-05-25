@@ -18,8 +18,6 @@ python llava/train/train_tpu.py \
     --mm_use_im_patch_token False \
     --image_aspect_ratio pad \
     --unpad True \
-    --unfreeze_mm_vision_tower \
-    --mm_vision_tower_lr 1e-5 \
     --group_by_modality_length True \
     --bf16 False \
     --output_dir ./checkpoints/$CKPT_NAME \
