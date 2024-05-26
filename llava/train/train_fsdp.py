@@ -2035,7 +2035,9 @@ def train(INDEX, attn_implementation=None):
     # xm.optimizer_step = patched_optimizer_step
 
     # convert_to_bf16_except_llama(model)
-  
+    if training_args.bf16:
+        model = model.to(dtype=torch.float32)
+
     callbacks = []
 
     if "wandb" in training_args.report_to:
@@ -2056,8 +2058,6 @@ def train(INDEX, attn_implementation=None):
         callbacks=callbacks,
         **data_module
     )
-
-    print("model looks like", model)
 
     if list(pathlib.Path(training_args.output_dir).glob("checkpoint-*")):
         log_rank0(f"Resuming from checkpoint: {training_args.output_dir}")

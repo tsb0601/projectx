@@ -225,8 +225,8 @@ class LLaVATrainer(Trainer):
 
         # Added code for unfreezing vision tower
         selected_module_names = ['vision_tower']
-        # if self.args.unfreeze_mm_vision_tower:
-        #     reduce_gradients(self.optimizer, self.param_to_name, selected_module_names)
+        if self.args.unfreeze_mm_vision_tower:
+            reduce_gradients(self.optimizer, self.param_to_name, selected_module_names)
 
         return loss.detach() / self.args.gradient_accumulation_steps
 
@@ -242,9 +242,9 @@ class LLaVATrainer(Trainer):
 
         opt_model = self.model
 
-        # if self.args.unfreeze_mm_vision_tower:
-        #     opt_model.get_model().vision_tower = opt_model.get_vision_tower()
-        #     self.param_to_name = map_params_to_module_names([opt_model, opt_model.get_vision_tower()])
+        if self.args.unfreeze_mm_vision_tower:
+            opt_model.get_model().vision_tower = opt_model.get_vision_tower()
+            self.param_to_name = map_params_to_module_names([opt_model, opt_model.get_vision_tower()])
 
         # for name, param in opt_model.named_parameters():
         #     print(f"Module: {name}")
