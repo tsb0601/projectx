@@ -670,11 +670,7 @@ def preprocess_v1(
         conv.messages = []
         for j, sentence in enumerate(source):
             role = roles[sentence["from"]]
-            try: 
-                assert role == conv.roles[j % 2], f"{i}"
-            except:
-                print("Here is the bug", sentence["from"], role)
-                exit()
+            assert role == conv.roles[j % 2], f"{i}"
             conv.append_message(role, sentence["value"])
         conversations.append(conv.get_prompt())
 
